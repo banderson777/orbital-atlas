@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Explore NASA's confirmed exoplanet catalog in a rotating 3D map of the Milky Way.">
+  <meta name="theme-color" content="#090e1a">
+  <title>Orbital Atlas — Exoplanet Explorer</title>
+  <link rel="icon" href="atlas.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="atlas.css">
+  <script defer src="catalog.js"></script>
+  <script defer src="atlas.js"></script>
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><img src="atlas.svg" alt=""><span>ORBITAL <b>ATLAS</b><small>EXOPLANET EXPLORER</small></span></div>
+    <div class="top-actions"><span class="source"><i></i> NASA EXOPLANET ARCHIVE</span><button id="guide-open" class="quiet">Data guide <span aria-hidden="true">↗</span></button></div>
+  </header>
+  <main>
+    <section class="intro" aria-labelledby="title">
+      <div><div class="eyebrow"><span></span> INTERACTIVE STAR CHART</div><h1 id="title">Worlds beyond Sol</h1><p>Explore the stars that host confirmed planets across the Milky Way.</p></div>
+      <div class="stats" aria-label="Catalog totals">
+        <div><strong id="system-total">—</strong><span>HOST SYSTEMS</span></div>
+        <div><strong id="planet-total">—</strong><span>CONFIRMED PLANETS</span></div>
+        <div><strong id="mapped-total">—</strong><span>MAPPED SYSTEMS</span></div>
+      </div>
+    </section>
+
+    <div class="workspace">
+      <aside class="panel explorer" aria-label="Catalog and filters">
+        <div class="explorer-controls">
+          <div class="section-head"><h2>Explore</h2><button id="clear" class="link-button">Reset filters</button></div>
+          <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5"/></svg><input id="search" type="search" autocomplete="off" placeholder="Find a star or planet…" aria-label="Find a star or planet"></label>
+          <fieldset><legend>PLANET CHARACTERISTICS</legend><div id="traits" class="traits"></div></fieldset>
+          <label class="field">DISCOVERY METHOD<select id="method"><option value="">Any method</option></select></label>
+          <label class="field">HOST SPECTRAL CLASS<select id="spectral"><option value="">Any spectral class</option></select></label>
+        </div>
+        <div class="list-heading"><h3>MATCHING HOSTS</h3><span id="matches" aria-live="polite"></span></div>
+        <div id="results" class="results" aria-label="Matching host systems"></div>
+      </aside>
+
+      <section class="panel map-panel" aria-label="Interactive three-dimensional star chart">
+        <div class="map-toolbar"><div><h2>Star chart</h2><span class="map-mode" id="map-mode">LOCAL NEIGHBORHOOD</span></div>
+          <div class="segments" aria-label="Chart view"><button data-view="sol" aria-pressed="true"><span aria-hidden="true">◎</span> Sol view</button><button data-view="galaxy" aria-pressed="false"><span aria-hidden="true">✧</span> Galactic</button></div>
+        </div>
+        <div class="sky" id="sky">
+          <canvas id="map" tabindex="0" aria-label="3D star chart. Arrow keys rotate. Plus and minus zoom. Use the matching hosts list to select a system."></canvas>
+          <div class="map-meta"><div><span class="live-dot"></span><span id="plot-count">Loading catalog…</span></div><span id="projection">SOL-CENTERED · GALACTIC PLANE</span></div>
+          <div class="zoom-controls" aria-label="Map controls">
+            <button id="zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
+            <button id="zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
+            <button id="recenter" title="Reset view" aria-label="Reset view">⌖</button>
+          </div>
+          <div class="map-bottom"><div class="scale"><span id="scale-label"></span><div id="scale-bar"></div></div><div class="legend"><span><i></i> Catalog host</span><span><i></i> Sol</span><span><i></i> Selected</span></div></div>
+          <div id="map-tip" class="tooltip" hidden></div>
+        </div>
+        <div class="map-footer"><span>Drag to rotate <b>·</b> Scroll to zoom <b>·</b> Shift + drag to pan</span><span id="map-notice">Select a star to inspect its system</span></div>
+      </section>
+
+      <aside class="panel inspector" id="inspector" aria-label="Selected planetary system">
+        <div class="section-head"><h2>System detail</h2><span class="inspector-kicker">ORBITAL VIEW</span></div>
+        <div id="system-detail"></div>
+      </aside>
+    </div>
+    <footer class="foot"><span><a href="https://exoplanetarchive.ipac.caltech.edu/docs/API_PS_columns.html" target="_blank" rel="noopener">NASA Exoplanet Archive</a> <b>·</b> <span id="snapshot-date"></span></span><span id="position-note"></span></footer>
+  </main>
+
+  <dialog id="guide">
+    <form method="dialog"><button class="quiet close" aria-label="Close data guide">×</button></form>
+    <div class="eyebrow"><span></span> REFERENCE</div><h2>Reading the atlas</h2>
+    <p>The catalog uses the NASA Exoplanet Archive’s Planetary Systems Composite Parameters table. Systems without a cataloged distance and sky position appear in search and system details. Sol provides a map reference.</p>
+    <dl>
+      <dt>Water vapor</dt><dd>Selected atmospheric detections with a source on each planet. Coverage is partial.</dd>
+      <dt>Rocky candidate</dt><dd>Catalog radius up to 1.6 Earth radii, with bulk density at least 3.5 g/cm³ when available. Composition remains uncertain. See <a href="https://arxiv.org/abs/1407.4457" target="_blank" rel="noopener">Rogers (2015)</a> for the radius threshold.</dd>
+      <dt>Cold / possibly frozen</dt><dd>Catalog equilibrium temperature at or below 200 K. Surface conditions and ice remain unknown.</dd>
+      <dt>Habitable zone</dt><dd>Estimated from incident flux and stellar temperature using the one-Earth-mass conservative boundaries from <a href="https://doi.org/10.1088/2041-8205/787/2/L29" target="_blank" rel="noopener">Kopparapu et al. (2014)</a> for 2,600–7,200 K. The cooler TRAPPIST-1 system uses <a href="https://science.nasa.gov/asset/webb/trappist-1-system-orbit-comparison/" target="_blank" rel="noopener">NASA’s published boundaries</a>. Surface habitability depends on additional conditions.</dd>
+      <dt>Giant</dt><dd>Catalog radius of at least 6 Earth radii.</dd>
+      <dt>Combining filters</dt><dd>One planet must satisfy all selected planet criteria. Search can match a host or a planet name.</dd>
+      <dt>Positions and orbits</dt><dd>The Milky Way backdrop is schematic. Catalog host positions use linear distances in galactic coordinates. The 2D orbit diagrams compress distances and use schematic orientation and phase. Dashed rings use orbit sizes estimated from orbital period and stellar mass. Orbits with no usable size appear in the planet list. Multi-star systems are represented by their catalog host point and show planets around a single diagram origin.</dd>
+    </dl>
+    <a href="https://exoplanetarchive.ipac.caltech.edu/docs/TAP/usingTAP.html" target="_blank" rel="noopener">NASA catalog and access documentation ↗</a>
+  </dialog>
+</body>
+</html>
