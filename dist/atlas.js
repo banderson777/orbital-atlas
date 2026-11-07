@@ -35,6 +35,10 @@ const trappistHZ = new Set(['TRAPPIST-1 e', 'TRAPPIST-1 f', 'TRAPPIST-1 g']);
 const trappistHZSource = 'https://science.nasa.gov/asset/webb/trappist-1-system-orbit-comparison/';
 const innerHZ = [1.107, 1.332e-4, 1.58e-8, -8.308e-12, -1.931e-15];
 const outerHZ = [0.356, 6.171e-5, 1.698e-9, -3.198e-12, -5.575e-16];
+const habitabilityEvidence = {
+  density: 'Density-supported',
+  radius: 'Radius-based',
+};
 
 function hzBoundary(coefficients, temperature) {
   const t = temperature - 5780;
@@ -88,11 +92,19 @@ function preparePlanet(planet, star) {
       flux >= hzBoundary(outerHZ,temp) && flux <= hzBoundary(innerHZ,temp)),
     giant: radius >= 6,
   };
+  planet.habitability = classifyHabitability(planet, radius, density);
   planet.flux = flux;
   planet.fluxEstimated = !!flux && (!!planet.pl_insollim || !positive(planet.pl_insol));
   planet.search = normalize(planet.pl_name);
   planet.color = planet.tags.water ? '#7bd6ff' : planet.tags.hz ? '#82e3d1' : planet.tags.giant ? '#d2a1fd' : planet.tags.cold ? '#aac6ff' : '#edb48f';
   return planet;
+}
+
+function classifyHabitability(planet, radius, density) {
+  if (!planet.tags.hz || !(radius > 0.5 && radius <= 2)) return null;
+  const reportedMass = ['Mass', 'Msin(i)/sin(i)'].includes(planet.pl_bmassprov);
+  if (reportedMass && planet.pl_bmasselim === 0 && positive(planet.pl_bmasse) && density >= 3.5) return 'density';
+  return planet.tags.rocky ? 'radius' : null;
 }
 
 function fields(keys, values) {
@@ -156,13 +168,15 @@ function updateFilters() {
   const query = normalize($('search').value);
   const method = $('method').value;
   const spectral = $('spectral').value;
+  const lifeSearch = $('life-search').value;
   const activeTraits = [...selectedTraits];
   matchingPlanets = new Map();
   matching = systems.filter((star) => {
     if (spectral && (star.spectral || 'other') !== spectral) return false;
     const hostMatches = !query || star.search.includes(query);
     const planets = star.planets.filter((planet) => (hostMatches || planet.search.includes(query)) &&
-      (!method || planet.discoverymethod === method) && activeTraits.every((id) => planet.tags[id]));
+      (!method || planet.discoverymethod === method) && activeTraits.every((id) => planet.tags[id]) &&
+      (!lifeSearch || (lifeSearch === 'candidate' ? planet.habitability : planet.habitability === lifeSearch)));
     if (!planets.length) return false;
     matchingPlanets.set(star.id, planets);
     return true;
@@ -170,11 +184,12 @@ function updateFilters() {
   $('matches').textContent = fmt(matching.length);
   listed = PAGE_SIZE;
   renderResults(true);
-  if (matching.length && (selected === solar || !matchingPlanets.has(selected.id)) && (query || method || spectral || selectedTraits.size)) {
+  if (matching.length && (selected === solar || !matchingPlanets.has(selected.id)) &&
+      (query || method || spectral || lifeSearch || selectedTraits.size)) {
     selectStar(matching[0], false);
   } else {
     const planets = matchingPlanets.get(selected.id);
-    if (planets?.length === 1 && selected.planets.length > 1) selectedPlanet = planets[0];
+    if (planets?.length === 1 && (lifeSearch || selected.planets.length > 1)) selectedPlanet = planets[0];
     else if (selectedPlanet && planets && !planets.includes(selectedPlanet)) selectedPlanet = null;
     renderDetail();
   }
@@ -206,7 +221,7 @@ function selectStar(star, reveal = true) {
   if (!star) return;
   selected = star;
   const planets = matchingPlanets.get(star.id);
-  selectedPlanet = planets?.length === 1 && star.planets.length > 1 ? planets[0] : null;
+  selectedPlanet = planets?.length === 1 && ($('life-search').value || star.planets.length > 1) ? planets[0] : null;
   for (const result of $('results').querySelectorAll('.result[aria-current=true]')) result.setAttribute('aria-current','false');
   $('results').querySelector(`[data-star="${star.id}"]`)?.setAttribute('aria-current','true');
   renderDetail();
@@ -246,8 +261,9 @@ $('traits').addEventListener('click', (event) => {
 $('search').addEventListener('input', updateFilters);
 $('method').addEventListener('change', updateFilters);
 $('spectral').addEventListener('change', updateFilters);
+$('life-search').addEventListener('change', updateFilters);
 $('clear').addEventListener('click', () => {
-  $('search').value = $('method').value = $('spectral').value = '';
+  $('search').value = $('method').value = $('spectral').value = $('life-search').value = '';
   selectedTraits.clear();
   for (const button of $('traits').children) button.setAttribute('aria-pressed','false');
   updateFilters();
@@ -275,7 +291,8 @@ function starTip(star) {
 function planetTip(planet) {
   const axis = planet.axis ? (planet.axisEstimated ? '≈ ' : '') + numberWithUnit(planet.axis, 'AU', 5) : '—';
   return `<strong>${escapeHtml(planet.pl_name)}</strong>Radius ${planet.pl_radelim ? '—' : numberWithUnit(planet.pl_rade, 'R⊕')}
-    · Period ${numberWithUnit(planet.pl_orbper,'d')}<br>Orbit ${axis} · Tₑq ${planet.pl_eqtlim ? '—' : numberWithUnit(planet.pl_eqt,'K',0)}`;
+    · Period ${numberWithUnit(planet.pl_orbper,'d')}<br>Orbit ${axis} · Tₑq ${planet.pl_eqtlim ? '—' : numberWithUnit(planet.pl_eqt,'K',0)}
+    ${planet.habitability ? '<br>' + habitabilityEvidence[planet.habitability] + ' habitability candidate' : ''}`;
 }
 
 function renderOrbit(star) {
@@ -325,6 +342,9 @@ function planetInfo(planet) {
     ${planet.projectedSeparation ? '<p>Projected separation ' + numberWithUnit(planet.projectedSeparation,'AU',4) + '</p>' : ''}
     <p>Tₑq ${planet.pl_eqtlim ? '—' : numberWithUnit(planet.pl_eqt,'K',0)} · Flux ${planet.fluxEstimated ? '≈ ' : ''}${numberWithUnit(planet.flux,'S⊕')}</p>
     ${flags ? '<p>' + flags + '</p>' : ''}
+    ${planet.habitability ? '<p>Habitability candidate · ' + habitabilityEvidence[planet.habitability] + '</p>' : ''}
+    ${planet.habitability === 'density' ? '<p>Bulk density ' + numberWithUnit(planet.pl_dens, 'g/cm³') + '</p>' : ''}
+    ${planet.discoverymethod ? '<p>Probability of life · Unknown</p>' : ''}
     ${planet.tags.water ? '<a target="_blank" rel="noopener" href="' + evidence[planet.pl_name] + '">Water vapor source ↗</a>' : ''}
     ${trappistHZ.has(planet.pl_name) ? '<a target="_blank" rel="noopener" href="' + trappistHZSource + '">Habitable zone source ↗</a>' : ''}</div>`;
 }

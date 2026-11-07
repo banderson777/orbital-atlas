@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 
 HOST = "hostname sy_snum sy_dist ra dec st_spectype st_teff st_mass st_rad st_lum".split()
 PLANET = ("pl_name discoverymethod disc_year pl_orbper pl_orbsmax pl_orbeccen "
-          "pl_rade pl_bmasse pl_bmassprov pl_dens pl_eqt pl_insol "
+          "pl_rade pl_bmasse pl_bmassprov pl_bmasselim pl_dens pl_eqt pl_insol "
           "pl_orbsmaxlim pl_radelim pl_denslim pl_eqtlim pl_insollim").split()
 QUERY = "select " + ",".join(HOST + PLANET) + " from pscomppars order by hostname,pl_name"
 ENDPOINT = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"

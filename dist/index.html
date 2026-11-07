@@ -32,6 +32,13 @@
           <div class="section-head"><h2>Explore</h2><button id="clear" class="link-button">Reset filters</button></div>
           <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5"/></svg><input id="search" type="search" autocomplete="off" placeholder="Find a star or planet…" aria-label="Find a star or planet"></label>
           <fieldset><legend>PLANET CHARACTERISTICS</legend><div id="traits" class="traits"></div></fieldset>
+          <label class="field">LIFE SEARCH<select id="life-search" aria-describedby="life-search-help">
+            <option value="">Any planet</option>
+            <option value="candidate">All habitability candidates</option>
+            <option value="density">Density-supported candidates</option>
+            <option value="radius">Radius-based candidates</option>
+          </select></label>
+          <p class="filter-help" id="life-search-help">Life probability is unknown. Filter by habitability evidence.</p>
           <label class="field">DISCOVERY METHOD<select id="method"><option value="">Any method</option></select></label>
           <label class="field">HOST SPECTRAL CLASS<select id="spectral"><option value="">Any spectral class</option></select></label>
         </div>
@@ -75,6 +82,8 @@
       <dt>Cold / possibly frozen</dt><dd>Catalog equilibrium temperature at or below 200 K. Surface conditions and ice remain unknown.</dd>
       <dt>Habitable zone</dt><dd>Estimated from incident flux and stellar temperature using the one-Earth-mass conservative boundaries from <a href="https://doi.org/10.1088/2041-8205/787/2/L29" target="_blank" rel="noopener">Kopparapu et al. (2014)</a> for 2,600–7,200 K. The cooler TRAPPIST-1 system uses <a href="https://science.nasa.gov/asset/webb/trappist-1-system-orbit-comparison/" target="_blank" rel="noopener">NASA’s published boundaries</a>. Surface habitability depends on additional conditions.</dd>
       <dt>Giant</dt><dd>Catalog radius of at least 6 Earth radii.</dd>
+      <dt>Life search</dt><dd>Shortlists planets in the atlas’s habitable zone with some evidence of a rocky composition. Radius-based candidates meet the rocky-candidate criteria and exceed 0.5 Earth radii. The atlas extends this size screen to 2 Earth radii for density-supported candidates with a measured mass and catalog bulk density of at least 3.5 g/cm³. The radius-based size range follows the <a href="https://phl.upr.edu/hwc" target="_blank" rel="noopener">Habitable Worlds Catalog</a>.</dd>
+      <dt>Probability of life</dt><dd>Unknown for every exoplanet in the atlas. The evidence categories describe how each planet qualifies for follow-up. Atmosphere, surface conditions, and evidence of life require further observations. <a href="https://science.nasa.gov/blogs/webb/2024/06/05/reconnaissance-of-potentially-habitable-worlds-with-nasas-webb/" target="_blank" rel="noopener">NASA’s guide to potentially habitable worlds</a>.</dd>
       <dt>Combining filters</dt><dd>One planet must satisfy all selected planet criteria. Search can match a host or a planet name.</dd>
       <dt>Positions and orbits</dt><dd>The Milky Way backdrop is schematic. Catalog host positions use linear distances in galactic coordinates. The 2D orbit diagrams compress distances and use schematic orientation and phase. Dashed rings use orbit sizes estimated from orbital period and stellar mass. Orbits with no usable size appear in the planet list. Multi-star systems are represented by their catalog host point and show planets around a single diagram origin.</dd>
     </dl>
