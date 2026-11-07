@@ -209,11 +209,19 @@ function renderResults(reset = false) {
     const details = star.st_spectype ? escapeHtml(star.st_spectype) : 'Spectral type unlisted';
     const count = matchingPlanets.get(star.id).length;
     return `<button class="result" data-star="${star.id}" aria-current="${star === selected}" title="${escapeHtml(star.name)}">
-      <i class="star-dot" style="--dot:${star.color}"></i><span><strong>${escapeHtml(star.name)}</strong><small>${details} · ${count} ${count === 1 ? 'planet' : 'planets'}</small></span><span>${star.distance === null ? '—' : fmt(star.distance, 1) + ' ly'}</span></button>`;
+      <i class="star-dot" data-dot="${star.color}"></i><span><strong>${escapeHtml(star.name)}</strong><small>${details} · ${count} ${count === 1 ? 'planet' : 'planets'}</small></span><span>${star.distance === null ? '—' : fmt(star.distance, 1) + ' ly'}</span></button>`;
   }).join(''));
+  colorDots(results);
   if (!matching.length) results.innerHTML = '<p class="empty">No systems match these filters.</p>';
   if (listed < matching.length) {
     results.insertAdjacentHTML('beforeend', '<button class="link-button load-more">Show more systems ↓</button>');
+  }
+}
+
+function colorDots(container) {
+  for (const dot of container.querySelectorAll('.star-dot[data-dot]')) {
+    dot.style.setProperty('--dot', dot.dataset.dot);
+    dot.removeAttribute('data-dot');
   }
 }
 
@@ -357,16 +365,17 @@ function renderDetail() {
   const star = selected;
   const matchingInSystem = matchingPlanets.get(star.id);
   const label = escapeHtml(star.label);
-  detail.innerHTML = `<div class="system-heading"><h3>${escapeHtml(star.name)}</h3><p>${label}${star.st_spectype && star.st_spectype !== star.label ? ' · ' + escapeHtml(star.st_spectype) : ''}${star.sy_snum > 1 ? ' · ' + star.sy_snum + ' stars' : ''}</p></div>
+  detail.innerHTML = `<div class="system-heading"><h3>${escapeHtml(star.name)}</h3><p>${label}${star.st_spectype && star.st_spectype !== star.label ? ' · ' + escapeHtml(star.st_spectype) : ''}${Number.isInteger(star.sy_snum) && star.sy_snum > 1 ? ' · ' + star.sy_snum + ' stars' : ''}</p></div>
     <div class="measurements"><div><strong>${numberWithUnit(star.distance,'ly',1)}</strong><span>Distance</span></div><div><strong>${numberWithUnit(star.st_teff,'K',0)}</strong><span>Stellar temp.</span></div><div><strong>${numberWithUnit(star.st_mass,'M☉')}</strong><span>Stellar mass</span></div></div>
     ${renderOrbit(star)}
     <div class="planet-title"><span>PLANETS</span><span>${star.planets.length} ${star === solar ? 'TOTAL' : 'CONFIRMED'}</span></div>
     <div class="planet-list">${star.planets.map((planet, index) =>
       `<button class="planet-row${matchingInSystem && !matchingInSystem.includes(planet) ? ' outside-filter' : ''}" data-object="${index}" aria-pressed="${selectedPlanet === planet}">
-      <i class="star-dot" style="--dot:${planet.color}"></i><strong>${escapeHtml(planet.pl_name)}</strong><span>${planet.axis ? (planet.axisEstimated ? '≈' : '') + numberWithUnit(planet.axis,'AU',4) : '—'}</span></button>`).join('')}</div>
+      <i class="star-dot" data-dot="${planet.color}"></i><strong>${escapeHtml(planet.pl_name)}</strong><span>${planet.axis ? (planet.axisEstimated ? '≈' : '') + numberWithUnit(planet.axis,'AU',4) : '—'}</span></button>`).join('')}</div>
     ${selectedPlanet ? planetInfo(selectedPlanet) : ''}
     <div class="catalog-links">${star === solar ? '<a href="https://science.nasa.gov/solar-system/planets/" target="_blank" rel="noopener">Solar System reference ↗</a>'
       : `<a href="https://exoplanetarchive.ipac.caltech.edu/overview/${encodeURIComponent(star.name)}" target="_blank" rel="noopener">Open NASA catalog entry ↗</a>`}</div>`;
+  colorDots(detail);
   detail.scrollTop = changed ? 0 : previousScroll;
 }
 
