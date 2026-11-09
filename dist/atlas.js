@@ -43,6 +43,10 @@ const habitabilityEvidence = {
   density: 'Density-supported',
   radius: 'Radius-based',
 };
+const massType = { Mass:'Reported mass', Msini:'Minimum mass', 'Msin(i)/sin(i)':'Inclination-corrected mass',
+  'M-R relationship':'Estimated from radius' };
+const comparison = new Map();
+const COMPARE_LIMIT = 3;
 
 function hzBoundary(coefficients, temperature) {
   const t = temperature - 5780;
@@ -212,8 +216,9 @@ function renderResults(reset = false) {
   results.insertAdjacentHTML('beforeend', matching.slice(previous, listed).map((star) => {
     const details = star.st_spectype ? escapeHtml(star.st_spectype) : 'Spectral type unlisted';
     const count = matchingPlanets.get(star.id).length;
-    return `<button class="result" data-star="${star.id}" aria-current="${star === selected}" title="${escapeHtml(star.name)}">
-      <i class="star-dot" data-dot="${star.color}"></i><span><strong>${escapeHtml(star.name)}</strong><small>${details} · ${count} ${count === 1 ? 'planet' : 'planets'}</small></span><span>${star.distance === null ? '—' : fmt(star.distance, 1) + ' ly'}</span></button>`;
+    return `<div class="compare-item"><button class="result" data-star="${star.id}" aria-current="${star === selected}" title="${escapeHtml(star.name)}">
+      <i class="star-dot" data-dot="${star.color}"></i><span><strong>${escapeHtml(star.name)}</strong><small>${details} · ${count} ${count === 1 ? 'planet' : 'planets'}</small></span><span>${star.distance === null ? '—' : fmt(star.distance, 1) + ' ly'}</span></button>
+      <button class="quiet compare-host" data-compare-host="${star.id}" aria-haspopup="dialog" aria-label="Compare planets from ${escapeHtml(star.name)}" title="Choose planets to compare">+</button></div>`;
   }).join(''));
   colorDots(results);
   if (!matching.length) results.innerHTML = '<p class="empty">No systems match these filters.</p>';
@@ -252,6 +257,8 @@ function selectStar(star, reveal = true) {
 }
 
 $('results').addEventListener('click', (event) => {
+  const compareHost = event.target.closest('[data-compare-host]');
+  if (compareHost) openComparison(systemById.get(Number(compareHost.dataset.compareHost)));
   const row = event.target.closest('[data-star]');
   if (row) selectStar(systemById.get(Number(row.dataset.star)));
   if (event.target.closest('.load-more')) {
@@ -281,6 +288,7 @@ $('clear').addEventListener('click', () => {
   updateFilters();
 });
 $('guide-open').addEventListener('click', () => $('guide').showModal());
+$('compare-open').addEventListener('click', () => openComparison());
 
 function showTip(tip, container, x, y, content) {
   tip.innerHTML = content;
@@ -362,8 +370,6 @@ function measurementEvidence(label, value, source, description) {
 
 function lifeEvidence(planet, star) {
   const density = planet.pl_denslim ? null : planet.pl_dens;
-  const massType = { Mass:'Reported mass', Msini:'Minimum mass', 'Msin(i)/sin(i)':'Inclination-corrected mass',
-    'M-R relationship':'Estimated from radius' };
   const trappist = trappistHZ.has(planet.pl_name);
   const range = trappist ? 'NASA places this orbit in the habitable zone.' :
     `The model’s flux range at this stellar temperature is ${fmt(hzBoundary(outerHZ, star.st_teff), 3)}–${fmt(hzBoundary(innerHZ, star.st_teff), 3)} S⊕.`;
@@ -384,13 +390,121 @@ function lifeEvidence(planet, star) {
       : planet.fluxEstimated ? measurementEvidence('Orbit size', numberWithUnit(planet.axis, 'AU', 4), planet.pl_orbsmax_reflink) : '',
     measurementEvidence('Stellar temperature', numberWithUnit(star.st_teff, 'K', 0), star.st_teff_reflink),
   ];
-  const composition = planet.habitability === 'density'
-    ? 'Radius is over 0.5 and up to 2 R⊕, with a reported mass and density of at least 3.5 g/cm³.'
-    : 'Radius is over 0.5 and up to 1.6 R⊕. The density evidence is limited.';
   return `<section class="life-evidence"><h5>Why it qualifies · ${habitabilityEvidence[planet.habitability]}</h5>
-    <p>${composition}</p><ul>${evidence.join('')}</ul>
+    <p>${compositionEvidence(planet)}</p><ul>${evidence.join('')}</ul>
     <p>${range}${referenceLink(trappist ? trappistHZSource : hzModelSource, 'Habitable zone source')}</p></section>`;
 }
+
+function compositionEvidence(planet) {
+  return planet.habitability === 'density'
+    ? 'Radius is over 0.5 and up to 2 R⊕, with a reported mass and density of at least 3.5 g/cm³.'
+    : 'Radius is over 0.5 and up to 1.6 R⊕. The density evidence is limited.';
+}
+
+function compareToggle(star, planet, showName = false) {
+  const included = comparison.has(planet);
+  return `<button class="quiet${showName ? '' : ' compare-toggle'}" data-compare-star="${star.id}"
+    data-compare-planet="${star.planets.indexOf(planet)}" aria-pressed="${included}"
+    aria-label="Compare ${escapeHtml(planet.pl_name)}" title="Toggle comparison">
+    <b aria-hidden="true">${included ? '✓' : '+'}</b>${showName ? ' ' + escapeHtml(planet.pl_name) : ''}</button>`;
+}
+
+function openComparison(star) {
+  $('compare-picker').hidden = !star;
+  $('compare-picker-title').textContent = star ? 'Matching planets in ' + star.name : '';
+  $('compare-choices').innerHTML = star ? matchingPlanets.get(star.id).map((planet) => compareToggle(star, planet, true)).join('') : '';
+  $('compare-message').textContent = '';
+  renderComparison();
+  $('compare').showModal();
+}
+
+function compareValue(value, unit, source, description, limit, digits = 2, extraSources = '') {
+  if (!Number.isFinite(value)) return '—<small>Missing</small>';
+  const origin = limit ? 'Catalog limit' : description || (source === nasaCalculated ? 'NASA calculated' : 'Catalog reported');
+  return `<strong>${numberWithUnit(value, unit, digits)}</strong><small>${origin}</small>
+    ${referenceLink(source)}${extraSources}`;
+}
+
+function compareFlux(planet, star) {
+  if (!planet.fluxEstimated) return compareValue(planet.flux, 'S⊕', planet.pl_insol_reflink, null, false, 3);
+  const orbitSources = planet.axisEstimated
+    ? referenceLink(planet.pl_orbper_reflink, 'Period source') + referenceLink(star.st_mass_reflink, 'Stellar mass source')
+    : referenceLink(planet.pl_orbsmax_reflink, 'Orbit source');
+  return compareValue(planet.flux, 'S⊕', null, 'Atlas estimate from luminosity and orbit size', false, 3,
+    referenceLink(star.st_lum_reflink, 'Luminosity source') + orbitSources);
+}
+
+function renderComparison() {
+  const entries = [...comparison];
+  $('compare-count').textContent = entries.length + '/' + COMPARE_LIMIT;
+  if (!entries.length) {
+    $('compare-content').innerHTML = '<p>Use + next to a matching host or a planet in System detail to start.</p>';
+    return;
+  }
+  const rows = [
+    ['Radius', (p, star) => compareValue(p.pl_rade, 'R⊕', p.pl_rade_reflink,
+      star === solar ? 'Solar System reference' : null, p.pl_radelim)],
+    ['Mass', (p, star) => compareValue(p.pl_bmasse, 'M⊕', p.pl_bmasse_reflink,
+      star === solar ? 'Solar System reference' : Object.hasOwn(massType, p.pl_bmassprov) ? massType[p.pl_bmassprov] : null, p.pl_bmasselim)],
+    ['Bulk density', (p) => compareValue(p.pl_dens, 'g/cm³', p.pl_dens_reflink, null, p.pl_denslim)],
+    ['Stellar flux', compareFlux],
+    ['Orbital period', (p, star) => compareValue(p.pl_orbper, 'days', p.pl_orbper_reflink, star === solar ? 'Solar System reference' : null)],
+    ['Life Search', (p, star) => star === solar ? 'Solar System reference' : p.habitability
+      ? `<strong>${habitabilityEvidence[p.habitability]}</strong><small>${compositionEvidence(p)}</small>
+        ${referenceLink(trappistHZ.has(p.pl_name) ? trappistHZSource : hzModelSource, 'Habitable zone source')}`
+      : 'Outside the candidate shortlist'],
+    ['Probability of life', (p, star) => star === solar && p.pl_name === 'Earth' ? 'Life observed' : 'Unknown'],
+  ];
+  $('compare-content').innerHTML = `<div class="compare-scroll" tabindex="0" role="region" aria-label="Scrollable planet comparison">
+    <table class="compare-table" aria-label="Planet measurements and Life Search evidence">
+      <thead><tr><th scope="col">Measurement</th>${entries.map(([planet, star]) =>
+        `<th scope="col">${escapeHtml(planet.pl_name)}<small>${escapeHtml(star.name)}</small>
+          <button class="quiet" data-remove-planet="${star.planets.indexOf(planet)}" data-remove-star="${star.id}"
+            aria-label="Remove ${escapeHtml(planet.pl_name)} from comparison">Remove</button></th>`).join('')}</tr></thead>
+      <tbody>${rows.map(([label, value]) => `<tr><th scope="row">${label}</th>${entries.map(([planet, star]) =>
+        `<td>${value(planet, star)}</td>`).join('')}</tr>`).join('')}</tbody>
+    </table></div>`;
+}
+
+function comparisonStar(id) {
+  return Number(id) === solar.id ? solar : systemById.get(Number(id));
+}
+
+function toggleComparison(button) {
+  const star = comparisonStar(button.dataset.compareStar);
+  const planet = star.planets[Number(button.dataset.comparePlanet)];
+  if (comparison.has(planet)) comparison.delete(planet);
+  else if (comparison.size < COMPARE_LIMIT) comparison.set(planet, star);
+  else {
+    if (!$('compare').open) openComparison();
+    $('compare-message').textContent = 'The comparison is full. Remove a planet to add another.';
+    return;
+  }
+  updateComparison();
+}
+
+function updateComparison() {
+  $('compare-message').textContent = '';
+  renderComparison();
+  for (const button of document.querySelectorAll('[data-compare-planet]')) {
+    const star = comparisonStar(button.dataset.compareStar);
+    const included = comparison.has(star.planets[Number(button.dataset.comparePlanet)]);
+    button.setAttribute('aria-pressed', String(included));
+    button.querySelector('b').textContent = included ? '✓' : '+';
+  }
+}
+
+$('compare').addEventListener('click', (event) => {
+  const toggle = event.target.closest('[data-compare-planet]');
+  if (toggle) toggleComparison(toggle);
+  const remove = event.target.closest('[data-remove-planet]');
+  if (remove) {
+    const star = comparisonStar(remove.dataset.removeStar);
+    comparison.delete(star.planets[Number(remove.dataset.removePlanet)]);
+    updateComparison();
+    ($('compare').querySelector('[data-remove-planet]') || $('compare').querySelector('.close')).focus();
+  }
+});
 
 function planetInfo(planet, star) {
   const mass = numberWithUnit(planet.pl_bmasse, 'M⊕');
@@ -422,8 +536,9 @@ function renderDetail() {
     ${renderOrbit(star)}
     <div class="planet-title"><span>PLANETS</span><span>${star.planets.length} ${star === solar ? 'TOTAL' : 'CONFIRMED'}</span></div>
     <div class="planet-list">${star.planets.map((planet, index) =>
-      `<button class="planet-row${matchingInSystem && !matchingInSystem.includes(planet) ? ' outside-filter' : ''}" data-object="${index}" aria-pressed="${selectedPlanet === planet}">
-      <i class="star-dot" data-dot="${planet.color}"></i><strong>${escapeHtml(planet.pl_name)}</strong><span>${planet.axis ? (planet.axisEstimated ? '≈' : '') + numberWithUnit(planet.axis,'AU',4) : '—'}</span></button>`).join('')}</div>
+      `<div class="compare-item"><button class="planet-row${matchingInSystem && !matchingInSystem.includes(planet) ? ' outside-filter' : ''}" data-object="${index}" aria-pressed="${selectedPlanet === planet}">
+      <i class="star-dot" data-dot="${planet.color}"></i><strong>${escapeHtml(planet.pl_name)}</strong><span>${planet.axis ? (planet.axisEstimated ? '≈' : '') + numberWithUnit(planet.axis,'AU',4) : '—'}</span></button>
+      ${compareToggle(star, planet)}</div>`).join('')}</div>
     ${selectedPlanet ? planetInfo(selectedPlanet, star) : ''}
     <div class="catalog-links">${star === solar ? '<a href="https://science.nasa.gov/solar-system/planets/" target="_blank" rel="noopener">Solar System reference ↗</a>'
       : `<a href="https://exoplanetarchive.ipac.caltech.edu/overview/${encodeURIComponent(star.name)}" target="_blank" rel="noopener">Open NASA catalog entry ↗</a>`}</div>`;
@@ -468,7 +583,11 @@ function selectPlanet(target) {
   if (focus) newTarget?.focus({ preventScroll:true });
   detail.querySelector('.planet-info')?.scrollIntoView({ block:'nearest' });
 }
-detail.addEventListener('click', (event) => selectPlanet(event.target.closest('[data-object]')));
+detail.addEventListener('click', (event) => {
+  const toggle = event.target.closest('[data-compare-planet]');
+  if (toggle) toggleComparison(toggle);
+  else selectPlanet(event.target.closest('[data-object]'));
+});
 detail.addEventListener('keydown', (event) => {
   if ((event.key === 'Enter' || event.key === ' ') && event.target.matches('g[role=button]')) {
     event.preventDefault();

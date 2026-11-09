@@ -16,7 +16,7 @@
 <body>
   <header class="top">
     <div class="brand"><img src="atlas.svg" alt=""><span>ORBITAL <b>ATLAS</b><small>EXOPLANET EXPLORER</small></span></div>
-    <div class="top-actions"><span class="source"><i></i> NASA EXOPLANET ARCHIVE</span><button id="guide-open" class="quiet">Data guide <span aria-hidden="true">↗</span></button></div>
+    <div class="top-actions"><span class="source"><i></i> NASA EXOPLANET ARCHIVE</span><button id="compare-open" class="quiet" aria-haspopup="dialog">Compare <span id="compare-count" aria-live="polite">0/3</span></button><button id="guide-open" class="quiet">Data guide <span aria-hidden="true">↗</span></button></div>
   </header>
   <main>
     <section class="intro" aria-labelledby="title">
@@ -73,6 +73,19 @@
     </div>
     <footer class="foot"><span><a href="https://exoplanetarchive.ipac.caltech.edu/docs/API_PS_columns.html" target="_blank" rel="noopener">NASA Exoplanet Archive</a> <b>·</b> <span id="snapshot-date"></span></span><span id="position-note"></span></footer>
   </main>
+
+  <dialog id="compare" aria-labelledby="compare-title">
+    <form method="dialog"><button class="quiet close" aria-label="Close comparison">×</button></form>
+    <div class="eyebrow"><span></span> PLANET COMPARISON</div>
+    <h2 id="compare-title">Compare planets</h2>
+    <p>Choose up to three planets. Your selections stay in the comparison as you search and filter.</p>
+    <section id="compare-picker" aria-labelledby="compare-picker-title" hidden>
+      <h3 id="compare-picker-title"></h3>
+      <div id="compare-choices"></div>
+    </section>
+    <p id="compare-message" role="status"></p>
+    <div id="compare-content"></div>
+  </dialog>
 
   <dialog id="guide">
     <form method="dialog"><button class="quiet close" aria-label="Close data guide">×</button></form>
