@@ -33,6 +33,20 @@
         <div class="explorer-controls">
           <div class="section-head"><h2>Explore</h2><button id="clear" class="link-button">Reset filters</button></div>
           <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5"/></svg><input id="search" type="search" autocomplete="off" placeholder="Find a star or planet…" aria-label="Find a star or planet"></label>
+          <div class="distance-controls">
+            <label class="field">MAX DISTANCE<select id="distance-limit">
+              <option value="">Any distance</option>
+              <option value="10">10 ly</option>
+              <option value="25">25 ly</option>
+              <option value="50">50 ly</option>
+              <option value="100">100 ly</option>
+              <option value="250">250 ly</option>
+              <option value="500">500 ly</option>
+              <option value="1000">1,000 ly</option>
+              <option value="5000">5,000 ly</option>
+            </select></label>
+            <button id="nearby" class="quiet" title="Show Earth-like candidates within 100 light-years">Nearby candidates</button>
+          </div>
           <fieldset><legend>PLANET CHARACTERISTICS</legend><div id="traits" class="traits"></div></fieldset>
           <label class="field">LIFE SEARCH<select id="life-search" aria-describedby="life-search-help">
             <option value="">Any planet</option>
@@ -44,7 +58,7 @@
           <label class="field">DISCOVERY METHOD<select id="method"><option value="">Any method</option></select></label>
           <label class="field">HOST SPECTRAL CLASS<select id="spectral"><option value="">Any spectral class</option></select></label>
         </div>
-        <div class="list-heading"><h3>MATCHING HOSTS</h3><span id="matches" aria-live="polite"></span></div>
+        <div class="list-heading"><h3>MATCHING HOSTS <small>NEAREST FIRST</small></h3><span id="matches" aria-live="polite"></span></div>
         <div id="results" class="results" aria-label="Matching host systems"></div>
       </aside>
 
@@ -99,6 +113,7 @@
       <dt>Giant</dt><dd>Catalog radius of at least 6 Earth radii.</dd>
       <dt>Life search</dt><dd>Shortlists planets in the atlas’s habitable zone with some evidence of a rocky composition. Radius-based candidates meet the rocky-candidate criteria and exceed 0.5 Earth radii. The atlas extends this size screen to 2 Earth radii for density-supported candidates with a measured mass and catalog bulk density of at least 3.5 g/cm³. The radius-based size range follows the <a href="https://phl.upr.edu/hwc" target="_blank" rel="noopener">Habitable Worlds Catalog</a>.</dd>
       <dt>Earth-like candidate</dt><dd>An atlas shortlist of Life Search candidates between 0.8 and 1.25 Earth radii that receive between 0.5 and 1.25 times Earth’s stellar flux. It includes reported and estimated values. Human settlement would require separate evidence about the atmosphere, surface, radiation, and other conditions. <a href="https://science.nasa.gov/exoplanets/terrestrial/" target="_blank" rel="noopener">NASA’s guide to terrestrial exoplanets</a>.</dd>
+      <dt>Nearby candidates</dt><dd>This preset clears the current filters and selects Earth-like candidates within 100 light-years of Sol. You can then adjust the distance or combine it with other filters. A distance limit includes hosts with a cataloged distance within that limit.</dd>
       <dt>Probability of life</dt><dd>Unknown for every exoplanet in the atlas. The evidence categories describe how each planet qualifies for follow-up. Atmosphere, surface conditions, and evidence of life require further observations. <a href="https://science.nasa.gov/blogs/webb/2024/06/05/reconnaissance-of-potentially-habitable-worlds-with-nasas-webb/" target="_blank" rel="noopener">NASA’s guide to potentially habitable worlds</a>.</dd>
       <dt>Combining filters</dt><dd>One planet must satisfy all selected planet criteria. Search can match a host or a planet name. System detail keeps every planet visible and shows planets outside the current filters in gray.</dd>
       <dt>Positions and orbits</dt><dd>The Milky Way backdrop is schematic. Catalog host positions use linear distances in galactic coordinates. The 2D orbit diagrams compress distances and use schematic orientation and phase. Dashed rings use orbit sizes estimated from orbital period and stellar mass. Orbits with no usable size appear in the planet list. Multi-star systems are represented by their catalog host point and show planets around a single diagram origin.</dd>

@@ -163,6 +163,7 @@ const mappedTotal = systems.filter((s) => s.position).length;
 const planetTotal = systems.reduce((total, s) => total + s.planets.length, 0);
 const systemById = new Map(systems.map((s) => [s.id, s]));
 const selectedTraits = new Set();
+const NEARBY_DISTANCE_LY = 100;
 let selected = systems.find((s) => s.name === 'TRAPPIST-1') ?? solar;
 let selectedPlanet = null;
 let matching = [];
@@ -189,10 +190,12 @@ function updateFilters() {
   const method = $('method').value;
   const spectral = $('spectral').value;
   const lifeSearch = $('life-search').value;
+  const distanceLimit = Number($('distance-limit').value);
   const activeTraits = [...selectedTraits];
   matchingPlanets = new Map();
   matching = systems.filter((star) => {
     if (spectral && (star.spectral || 'other') !== spectral) return false;
+    if (distanceLimit && (star.distance === null || star.distance > distanceLimit)) return false;
     const hostMatches = !query || star.search.includes(query);
     const planets = star.planets.filter((planet) => (hostMatches || planet.search.includes(query)) &&
       (!method || planet.discoverymethod === method) && activeTraits.every((id) => planet.tags[id]) &&
@@ -205,7 +208,7 @@ function updateFilters() {
   listed = PAGE_SIZE;
   renderResults(true);
   if (matching.length && (selected === solar || !matchingPlanets.has(selected.id)) &&
-      (query || method || spectral || lifeSearch || selectedTraits.size)) {
+      (query || method || spectral || lifeSearch || distanceLimit || selectedTraits.size)) {
     selectStar(matching[0], false);
   } else {
     const planets = matchingPlanets.get(selected.id);
@@ -293,12 +296,19 @@ $('search').addEventListener('input', updateFilters);
 $('method').addEventListener('change', updateFilters);
 $('spectral').addEventListener('change', updateFilters);
 $('life-search').addEventListener('change', updateFilters);
-$('clear').addEventListener('click', () => {
+$('distance-limit').addEventListener('change', updateFilters);
+
+function resetFilters(nearby = false) {
   $('search').value = $('method').value = $('spectral').value = $('life-search').value = '';
+  $('distance-limit').value = nearby ? String(NEARBY_DISTANCE_LY) : '';
   selectedTraits.clear();
-  for (const button of $('traits').children) button.setAttribute('aria-pressed','false');
+  if (nearby) selectedTraits.add('earth-like');
+  for (const button of $('traits').children) button.setAttribute('aria-pressed', String(selectedTraits.has(button.dataset.trait)));
   updateFilters();
-});
+}
+
+$('clear').addEventListener('click', () => resetFilters());
+$('nearby').addEventListener('click', () => resetFilters(true));
 $('guide-open').addEventListener('click', () => $('guide').showModal());
 $('compare-open').addEventListener('click', () => openComparison());
 
@@ -457,6 +467,10 @@ function compareFlux(planet, star) {
     referenceLink(star.st_lum_reflink, 'Luminosity source') + orbitSources);
 }
 
+function catalogOverview(star) {
+  return 'https://exoplanetarchive.ipac.caltech.edu/overview/' + encodeURIComponent(star.name);
+}
+
 function renderComparison() {
   const entries = [...comparison];
   $('compare-count').textContent = entries.length + '/' + COMPARE_LIMIT;
@@ -465,6 +479,8 @@ function renderComparison() {
     return;
   }
   const rows = [
+    ['Distance from Sol', (_planet, star) => compareValue(star.distance, 'ly', star === solar ? null : catalogOverview(star),
+      star === solar ? 'Solar System reference' : 'NASA catalog distance')],
     ['Radius', (p, star) => compareValue(p.pl_rade, 'R⊕', p.pl_rade_reflink,
       star === solar ? 'Solar System reference' : null, p.pl_radelim)],
     ['Mass', (p, star) => compareValue(p.pl_bmasse, 'M⊕', p.pl_bmasse_reflink,
@@ -572,7 +588,7 @@ function renderDetail() {
     }).join('')}</div>
     ${selectedPlanet ? planetInfo(selectedPlanet, star) : ''}
     <div class="catalog-links">${star === solar ? '<a href="https://science.nasa.gov/solar-system/planets/" target="_blank" rel="noopener">Solar System reference ↗</a>'
-      : `<a href="https://exoplanetarchive.ipac.caltech.edu/overview/${encodeURIComponent(star.name)}" target="_blank" rel="noopener">Open NASA catalog entry ↗</a>`}</div>`;
+      : `<a href="${catalogOverview(star)}" target="_blank" rel="noopener">Open NASA catalog entry ↗</a>`}</div>`;
   colorDots(detail);
   detail.scrollTop = changed ? 0 : previousScroll;
 }
