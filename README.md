@@ -9,3 +9,7 @@ Drag to rotate and scroll or pinch to zoom. Hold Shift while dragging to pan. Th
 Run `python3 refresh_catalog.py --check` with Python 3.9 or later and internet access. It lists added and removed names and changed fields for both hosts and planets without writing the snapshot. Run `python3 refresh_catalog.py` to replace `dist/catalog.js` after review. To check and apply the same previously saved TAP JSON response, pass `--input PATH --date YYYY-MM-DD` to both commands.
 
 The Data guide in the app explains the filter thresholds, the coverage of water-vapor detections, and how to read the map and orbit diagrams. The NASA table's [column definitions](https://exoplanetarchive.ipac.caltech.edu/docs/API_PS_columns.html) document the original measurements.
+
+## Build the hosted version
+
+Run `python3 build_worker.py` after refreshing the catalog. It embeds the chart assets in `dist/server/index.js` for Sites. The Worker sets HTTP security headers and serves only the chart files. The offline entry point is still `dist/index.html`.
