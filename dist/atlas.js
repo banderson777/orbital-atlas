@@ -40,6 +40,7 @@ const referenceHosts = new Set(['exoplanetarchive.ipac.caltech.edu', 'exofop.ipa
 const innerHZ = [1.107, 1.332e-4, 1.58e-8, -8.308e-12, -1.931e-15];
 const outerHZ = [0.356, 6.171e-5, 1.698e-9, -3.198e-12, -5.575e-16];
 const habitableOrbitColor = '#64df8e';
+const unmatchedPlanetColor = '#858b99';
 const habitabilityEvidence = {
   density: 'Density-supported',
   radius: 'Radius-based',
@@ -323,7 +324,7 @@ function planetTip(planet) {
     ${planet.habitability ? '<br>' + habitabilityEvidence[planet.habitability] + ' habitability candidate' : ''}`;
 }
 
-function renderOrbit(star) {
+function renderOrbit(star, matchingInSystem) {
   const known = star.planets.filter((planet) => positive(planet.axis)).sort((a,b) => a.axis - b.axis);
   const min = known[0]?.axis || 1;
   const compression = (axis) => Math.log1p(axis / min);
@@ -340,17 +341,19 @@ function renderOrbit(star) {
     const y = b * Math.sin(angle);
     const highlighted = selectedPlanet === planet;
     const planetIndex = star.planets.indexOf(planet);
-    const habitable = planetInHabitableZone(star, planet);
-    const stroke = habitable ? habitableOrbitColor : highlighted ? planet.color : '#514b75';
+    const matches = matchingInSystem.has(planet);
+    const habitable = matches && planetInHabitableZone(star, planet);
+    const color = matches ? planet.color : unmatchedPlanetColor;
+    const stroke = habitable ? habitableOrbitColor : color;
     const strokeWidth = habitable ? (highlighted ? 2.5 : 1.8) : highlighted ? 1.8 : 1;
     (habitable ? habitableOrbits : orbits).push(`<ellipse cx="${-a*e}" cy="0" rx="${a}" ry="${b}" fill="none"
-      stroke="${stroke}" stroke-opacity="${habitable ? 1 : highlighted ? .88 : .65}" stroke-width="${strokeWidth}"
+      stroke="${stroke}" stroke-opacity="${habitable ? 1 : highlighted ? .9 : matches ? .72 : .55}" stroke-width="${strokeWidth}"
       ${habitable ? 'class="habitable-orbit"' : ''}
       ${planet.axisEstimated ? 'stroke-dasharray="3 3"' : ''}/>`);
     const size = positive(planet.pl_rade) && !planet.pl_radelim ? Math.min(6, 2.5 + Math.sqrt(planet.pl_rade)) : 3;
     bodies.push(`<g data-object="${planetIndex}" tabindex="0" role="button" aria-label="${escapeHtml(planet.pl_name)}" transform="translate(${x} ${y})">
-      <circle r="${Math.max(6,size)}" fill="transparent"/><circle r="${size + 3}" fill="${planet.color}" opacity="${highlighted ? '.36' : '.13'}"/>
-      <circle class="body" r="${size}" fill="${planet.color}"/></g>`);
+      <circle r="${Math.max(6,size)}" fill="transparent"/><circle r="${size + 3}" fill="${color}" opacity="${highlighted ? '.36' : '.13'}"/>
+      <circle class="body" r="${size}" fill="${color}"/></g>`);
   });
   return `<div class="orbit-frame" id="orbit-frame"><svg viewBox="0 0 250 221" aria-label="Face-on schematic of the system">
     <defs><radialGradient id="star-glow"><stop stop-color="${star.color}" stop-opacity=".65"/><stop offset="1" stop-color="${star.color}" stop-opacity="0"/></radialGradient></defs>
@@ -545,18 +548,24 @@ function renderDetail() {
   const changed = detail.dataset.system !== String(selected.id);
   detail.dataset.system = selected.id;
   const star = selected;
-  const matchingInSystem = matchingPlanets.get(star.id);
+  const matchingInSystem = new Set(star === solar ? star.planets : matchingPlanets.get(star.id));
+  const filtered = matchingInSystem.size < star.planets.length;
   const label = escapeHtml(star.label);
   detail.innerHTML = `<div class="system-heading"><h3>${escapeHtml(star.name)}</h3><p>${label}${star.st_spectype && star.st_spectype !== star.label ? ' · ' + escapeHtml(star.st_spectype) : ''}${Number.isInteger(star.sy_snum) && star.sy_snum > 1 ? ' · ' + star.sy_snum + ' stars' : ''}</p></div>
     <div class="measurements"><div><strong>${numberWithUnit(star.distance,'ly',1)}</strong><span>Distance</span></div><div><strong>${numberWithUnit(star.st_teff,'K',0)}</strong><span>Stellar temp.</span></div><div><strong>${numberWithUnit(star.st_mass,'M☉')}</strong><span>Stellar mass</span></div></div>
-    ${renderOrbit(star)}
-    <div class="planet-title"><span>PLANETS</span><span>${star.planets.length} ${star === solar ? 'TOTAL' : 'CONFIRMED'}</span></div>
-    <div class="planet-list">${star.planets.map((planet, index) =>
-      `<div class="compare-item"><button class="planet-row${matchingInSystem && !matchingInSystem.includes(planet) ? ' outside-filter' : ''}" data-object="${index}" aria-pressed="${selectedPlanet === planet}">
-      <i class="star-dot" data-dot="${planet.color}"></i><span class="planet-name"><strong>${escapeHtml(planet.pl_name)}</strong>
-      ${planetInHabitableZone(star, planet) ? '<small class="habitable-label">Habitable zone' + (positive(planet.axis) ? '' : ' · Orbit size unavailable') + '</small>' : ''}</span>
+    ${renderOrbit(star, matchingInSystem)}
+    <div class="planet-title"><span>PLANETS</span><span>${filtered ? matchingInSystem.size + ' OF ' + star.planets.length + ' MATCH' : star.planets.length + (star === solar ? ' TOTAL' : ' CONFIRMED')}</span></div>
+    <div class="planet-list">${star.planets.map((planet, index) => {
+      const matches = matchingInSystem.has(planet);
+      const habitable = planetInHabitableZone(star, planet);
+      const note = [habitable ? 'Habitable zone' : '', matches ? '' : 'Outside filters',
+        habitable && !positive(planet.axis) ? 'Orbit size unavailable' : ''].filter(Boolean).join(' · ');
+      return `<div class="compare-item"><button class="planet-row${matches ? '' : ' outside-filter'}" data-object="${index}" aria-pressed="${selectedPlanet === planet}">
+      <i class="star-dot" data-dot="${matches ? planet.color : unmatchedPlanetColor}"></i><span class="planet-name"><strong>${escapeHtml(planet.pl_name)}</strong>
+      ${note ? '<small class="planet-note">' + note + '</small>' : ''}</span>
       <span>${planet.axis ? (planet.axisEstimated ? '≈' : '') + numberWithUnit(planet.axis,'AU',4) : '—'}</span></button>
-      ${compareToggle(star, planet)}</div>`).join('')}</div>
+      ${compareToggle(star, planet)}</div>`;
+    }).join('')}</div>
     ${selectedPlanet ? planetInfo(selectedPlanet, star) : ''}
     <div class="catalog-links">${star === solar ? '<a href="https://science.nasa.gov/solar-system/planets/" target="_blank" rel="noopener">Solar System reference ↗</a>'
       : `<a href="https://exoplanetarchive.ipac.caltech.edu/overview/${encodeURIComponent(star.name)}" target="_blank" rel="noopener">Open NASA catalog entry ↗</a>`}</div>`;
