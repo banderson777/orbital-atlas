@@ -29,6 +29,7 @@ const traits = [
   { id:'rocky', label:'Rocky candidate', symbol:'⬡', help:'Radius and, when available, bulk density suggest a rocky candidate' },
   { id:'cold', label:'Cold / frozen?', symbol:'❄', help:'Catalog equilibrium temperature at or below 200 K' },
   { id:'hz', label:'Habitable zone', symbol:'◎', help:'Estimated conservative habitable zone' },
+  { id:'earth-like', label:'Earth-like candidate', symbol:'⊕', help:'Life Search candidates with 0.8–1.25 Earth radii and 0.5–1.25 Earth flux' },
   { id:'giant', label:'Giant', symbol:'◉', help:'At least six Earth radii' },
 ];
 const trappistHZ = new Set(['TRAPPIST-1 e', 'TRAPPIST-1 f', 'TRAPPIST-1 g']);
@@ -110,6 +111,8 @@ function preparePlanet(planet, star) {
     giant: radius >= 6,
   };
   planet.habitability = classifyHabitability(planet, radius, density);
+  planet.tags['earth-like'] = planet.habitability !== null &&
+    radius >= 0.8 && radius <= 1.25 && flux >= 0.5 && flux <= 1.25;
   planet.flux = flux;
   planet.fluxEstimated = !!flux && (!!planet.pl_insollim || !positive(planet.pl_insol));
   planet.search = normalize(planet.pl_name);
@@ -411,7 +414,8 @@ function lifeEvidence(planet, star) {
   ];
   return `<section class="life-evidence"><h5>Why it qualifies · ${habitabilityEvidence[planet.habitability]}</h5>
     <p>${compositionEvidence(planet)}</p><ul>${evidence.join('')}</ul>
-    <p>${range}${referenceLink(trappist ? trappistHZSource : hzModelSource, 'Habitable zone source')}</p></section>`;
+    <p>${range}${referenceLink(trappist ? trappistHZSource : hzModelSource, 'Habitable zone source')}</p>
+    ${planet.tags['earth-like'] ? '<p>Earth-like candidate · Radius and stellar flux meet the atlas’s Earth-like screen.</p>' : ''}</section>`;
 }
 
 function compositionEvidence(planet) {
