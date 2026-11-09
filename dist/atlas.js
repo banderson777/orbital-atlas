@@ -53,6 +53,11 @@ function hzBoundary(coefficients, temperature) {
   return coefficients.reduceRight((value, coefficient) => value * t + coefficient, 0);
 }
 
+function withinHabitableZone(temperature, flux) {
+  return temperature >= 2600 && temperature <= 7200 &&
+    flux >= hzBoundary(outerHZ, temperature) && flux <= hzBoundary(innerHZ, temperature);
+}
+
 function stellarClass(star) {
   const type = star.st_spectype?.trim() || '';
   if (/^D[ABCOQXZ]?(?:\d|\b)|white dwarf/i.test(type)) return 'White dwarf';
@@ -91,13 +96,11 @@ function preparePlanet(planet, star) {
   planet.projectedSeparation = projected && listedAxis ? planet.pl_orbsmax : null;
   const flux = !planet.pl_insollim && positive(planet.pl_insol) ? planet.pl_insol
     : positive(planet.axis) && Number.isFinite(star.st_lum) ? 10 ** star.st_lum / planet.axis ** 2 : null;
-  const temp = star.st_teff;
   planet.tags = {
     water: Object.prototype.hasOwnProperty.call(evidence, planet.pl_name),
     rocky: positive(radius) && radius <= 1.6 && (!positive(density) || density >= 3.5),
     cold: !planet.pl_eqtlim && positive(planet.pl_eqt) && planet.pl_eqt <= 200,
-    hz: trappistHZ.has(planet.pl_name) || (temp >= 2600 && temp <= 7200 &&
-      flux >= hzBoundary(outerHZ,temp) && flux <= hzBoundary(innerHZ,temp)),
+    hz: trappistHZ.has(planet.pl_name) || withinHabitableZone(star.st_teff, flux),
     giant: radius >= 6,
   };
   planet.habitability = classifyHabitability(planet, radius, density);
@@ -322,6 +325,7 @@ function renderOrbit(star) {
   const maxExtent = Math.max(1, ...known.map((planet) => compression(planet.axis) * (1 + eccentricity(planet))));
   const orbits = [];
   const bodies = [];
+  let hasHabitableOrbit = false;
   known.forEach((planet, index) => {
     const e = eccentricity(planet);
     const a = 94 * compression(planet.axis) / maxExtent;
@@ -331,7 +335,12 @@ function renderOrbit(star) {
     const y = b * Math.sin(angle);
     const highlighted = selectedPlanet === planet;
     const planetIndex = star.planets.indexOf(planet);
-    orbits.push(`<ellipse cx="${-a*e}" cy="0" rx="${a}" ry="${b}" fill="none" stroke="${highlighted ? planet.color : '#514b75'}" stroke-opacity="${highlighted ? '.88' : '.65'}" ${planet.axisEstimated ? 'stroke-dasharray="3 3"' : ''}/>`);
+    const habitable = star === solar ? withinHabitableZone(star.st_teff, 1 / planet.axis ** 2) : planet.tags.hz;
+    hasHabitableOrbit ||= habitable;
+    orbits.push(`<ellipse cx="${-a*e}" cy="0" rx="${a}" ry="${b}" fill="none"
+      stroke="${highlighted ? planet.color : '#514b75'}" stroke-opacity="${highlighted ? '.88' : '.65'}"
+      ${habitable ? 'class="habitable-orbit"' : ''} ${highlighted ? 'stroke-width="1.8"' : ''}
+      ${planet.axisEstimated ? 'stroke-dasharray="3 3"' : ''}/>`);
     const size = positive(planet.pl_rade) && !planet.pl_radelim ? Math.min(6, 2.5 + Math.sqrt(planet.pl_rade)) : 3;
     bodies.push(`<g data-object="${planetIndex}" tabindex="0" role="button" aria-label="${escapeHtml(planet.pl_name)}" transform="translate(${x} ${y})">
       <circle r="${Math.max(6,size)}" fill="transparent"/><circle r="${size + 3}" fill="${planet.color}" opacity="${highlighted ? '.36' : '.13'}"/>
@@ -343,6 +352,7 @@ function renderOrbit(star) {
     <g transform="translate(125 105)">${orbits.join('')}
     <g data-object="star" tabindex="0" role="img" aria-label="${escapeHtml(star.name)}"><circle r="29" fill="url(#star-glow)"/><circle class="body" r="7" fill="${star.color}"/><circle cx="-1.5" cy="-1.5" r="4.2" fill="#fff5e8" opacity=".65"/></g>
     ${bodies.join('')}</g></svg>
+    ${hasHabitableOrbit ? '<div class="orbit-habitable-key">HABITABLE ZONE ORBIT</div>' : ''}
     <div class="orbit-caption">${known.length ? 'COMPRESSED ORBIT SCALE' + (known.length < star.planets.length ? ' · ' + (star.planets.length - known.length) + ' UNPLOTTED' : '') : 'ORBIT SIZES UNAVAILABLE'}</div>
     <div id="orbit-tip" class="tooltip" hidden></div></div>`;
 }
