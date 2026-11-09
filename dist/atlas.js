@@ -39,6 +39,7 @@ const referenceHosts = new Set(['exoplanetarchive.ipac.caltech.edu', 'exofop.ipa
   'ui.adsabs.harvard.edu', 'www.nature.com', 'doi.org', 'science.nasa.gov']);
 const innerHZ = [1.107, 1.332e-4, 1.58e-8, -8.308e-12, -1.931e-15];
 const outerHZ = [0.356, 6.171e-5, 1.698e-9, -3.198e-12, -5.575e-16];
+const habitableOrbitColor = '#64df8e';
 const habitabilityEvidence = {
   density: 'Density-supported',
   radius: 'Radius-based',
@@ -56,6 +57,10 @@ function hzBoundary(coefficients, temperature) {
 function withinHabitableZone(temperature, flux) {
   return temperature >= 2600 && temperature <= 7200 &&
     flux >= hzBoundary(outerHZ, temperature) && flux <= hzBoundary(innerHZ, temperature);
+}
+
+function planetInHabitableZone(star, planet) {
+  return star === solar ? withinHabitableZone(star.st_teff, 1 / planet.axis ** 2) : planet.tags.hz;
 }
 
 function stellarClass(star) {
@@ -324,8 +329,8 @@ function renderOrbit(star) {
   const compression = (axis) => Math.log1p(axis / min);
   const maxExtent = Math.max(1, ...known.map((planet) => compression(planet.axis) * (1 + eccentricity(planet))));
   const orbits = [];
+  const habitableOrbits = [];
   const bodies = [];
-  let hasHabitableOrbit = false;
   known.forEach((planet, index) => {
     const e = eccentricity(planet);
     const a = 94 * compression(planet.axis) / maxExtent;
@@ -335,11 +340,12 @@ function renderOrbit(star) {
     const y = b * Math.sin(angle);
     const highlighted = selectedPlanet === planet;
     const planetIndex = star.planets.indexOf(planet);
-    const habitable = star === solar ? withinHabitableZone(star.st_teff, 1 / planet.axis ** 2) : planet.tags.hz;
-    hasHabitableOrbit ||= habitable;
-    orbits.push(`<ellipse cx="${-a*e}" cy="0" rx="${a}" ry="${b}" fill="none"
-      stroke="${highlighted ? planet.color : '#514b75'}" stroke-opacity="${highlighted ? '.88' : '.65'}"
-      ${habitable ? 'class="habitable-orbit"' : ''} ${highlighted ? 'stroke-width="1.8"' : ''}
+    const habitable = planetInHabitableZone(star, planet);
+    const stroke = habitable ? habitableOrbitColor : highlighted ? planet.color : '#514b75';
+    const strokeWidth = habitable ? (highlighted ? 2.5 : 1.8) : highlighted ? 1.8 : 1;
+    (habitable ? habitableOrbits : orbits).push(`<ellipse cx="${-a*e}" cy="0" rx="${a}" ry="${b}" fill="none"
+      stroke="${stroke}" stroke-opacity="${habitable ? 1 : highlighted ? .88 : .65}" stroke-width="${strokeWidth}"
+      ${habitable ? 'class="habitable-orbit"' : ''}
       ${planet.axisEstimated ? 'stroke-dasharray="3 3"' : ''}/>`);
     const size = positive(planet.pl_rade) && !planet.pl_radelim ? Math.min(6, 2.5 + Math.sqrt(planet.pl_rade)) : 3;
     bodies.push(`<g data-object="${planetIndex}" tabindex="0" role="button" aria-label="${escapeHtml(planet.pl_name)}" transform="translate(${x} ${y})">
@@ -349,10 +355,10 @@ function renderOrbit(star) {
   return `<div class="orbit-frame" id="orbit-frame"><svg viewBox="0 0 250 221" aria-label="Face-on schematic of the system">
     <defs><radialGradient id="star-glow"><stop stop-color="${star.color}" stop-opacity=".65"/><stop offset="1" stop-color="${star.color}" stop-opacity="0"/></radialGradient></defs>
     <path d="M19 105h212M125 7v197" stroke="#25243c" stroke-dasharray="2 4"/>
-    <g transform="translate(125 105)">${orbits.join('')}
+    <g transform="translate(125 105)">${orbits.join('')}${habitableOrbits.join('')}
     <g data-object="star" tabindex="0" role="img" aria-label="${escapeHtml(star.name)}"><circle r="29" fill="url(#star-glow)"/><circle class="body" r="7" fill="${star.color}"/><circle cx="-1.5" cy="-1.5" r="4.2" fill="#fff5e8" opacity=".65"/></g>
     ${bodies.join('')}</g></svg>
-    ${hasHabitableOrbit ? '<div class="orbit-habitable-key">HABITABLE ZONE ORBIT</div>' : ''}
+    ${habitableOrbits.length ? '<div class="orbit-habitable-key">HABITABLE ZONE ORBIT</div>' : ''}
     <div class="orbit-caption">${known.length ? 'COMPRESSED ORBIT SCALE' + (known.length < star.planets.length ? ' · ' + (star.planets.length - known.length) + ' UNPLOTTED' : '') : 'ORBIT SIZES UNAVAILABLE'}</div>
     <div id="orbit-tip" class="tooltip" hidden></div></div>`;
 }
@@ -547,7 +553,9 @@ function renderDetail() {
     <div class="planet-title"><span>PLANETS</span><span>${star.planets.length} ${star === solar ? 'TOTAL' : 'CONFIRMED'}</span></div>
     <div class="planet-list">${star.planets.map((planet, index) =>
       `<div class="compare-item"><button class="planet-row${matchingInSystem && !matchingInSystem.includes(planet) ? ' outside-filter' : ''}" data-object="${index}" aria-pressed="${selectedPlanet === planet}">
-      <i class="star-dot" data-dot="${planet.color}"></i><strong>${escapeHtml(planet.pl_name)}</strong><span>${planet.axis ? (planet.axisEstimated ? '≈' : '') + numberWithUnit(planet.axis,'AU',4) : '—'}</span></button>
+      <i class="star-dot" data-dot="${planet.color}"></i><span class="planet-name"><strong>${escapeHtml(planet.pl_name)}</strong>
+      ${planetInHabitableZone(star, planet) ? '<small class="habitable-label">Habitable zone' + (positive(planet.axis) ? '' : ' · Orbit size unavailable') + '</small>' : ''}</span>
+      <span>${planet.axis ? (planet.axisEstimated ? '≈' : '') + numberWithUnit(planet.axis,'AU',4) : '—'}</span></button>
       ${compareToggle(star, planet)}</div>`).join('')}</div>
     ${selectedPlanet ? planetInfo(selectedPlanet, star) : ''}
     <div class="catalog-links">${star === solar ? '<a href="https://science.nasa.gov/solar-system/planets/" target="_blank" rel="noopener">Solar System reference ↗</a>'

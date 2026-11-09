@@ -104,13 +104,13 @@ legend,.field,.list-heading h3,.inspector-kicker{font-size:10px;letter-spacing:.
 .orbit-frame [tabindex]{cursor:pointer}
 .orbit-frame [tabindex]:focus .body,.orbit-frame [tabindex]:hover .body{stroke:#fff;stroke-width:1.5px}
 .orbit-caption{position:absolute;bottom:6px;left:7px;color:#9ba5c2;font:8px Consolas,monospace;pointer-events:none}
-.orbit-frame .habitable-orbit{stroke:#64df8e;stroke-opacity:.85}
 .orbit-habitable-key{position:absolute;top:6px;left:7px;color:#64df8e;font:8px Consolas,monospace;pointer-events:none}
 .planet-title{margin:12px 14px 5px;display:flex;align-items:center;justify-content:space-between;font:10px Consolas,monospace;color:var(--muted);letter-spacing:.075em}
 .planet-list{padding:0 13px 9px}
 .planet-row{width:100%;border:0;border-bottom:1px solid #2a3249;background:none;padding:7px 3px;display:grid;grid-template-columns:10px 1fr auto;align-items:center;text-align:left;gap:6px;font-size:11px}
 .planet-row:hover,.planet-row[aria-pressed=true]{background:#201c35}
 .planet-row strong{font-weight:600;overflow-wrap:anywhere}
+.planet-row .habitable-label{display:block;color:#64df8e;font-size:10px}
 .planet-row span:last-child{color:var(--muted)}
 .planet-info,.catalog-links{padding:8px 14px 13px;color:var(--muted);font-size:11px}
 .planet-info{border-top:1px solid var(--line);background:#131a2b}
