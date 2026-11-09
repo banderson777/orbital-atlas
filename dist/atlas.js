@@ -192,13 +192,19 @@ function updateFilters() {
   const lifeSearch = $('life-search').value;
   const distanceLimit = Number($('distance-limit').value);
   const activeTraits = [...selectedTraits];
+  const matchAllTraits = $('trait-match').value === 'all';
+  const matchesTraits = (planet) => {
+    if (!activeTraits.length) return true;
+    const hasTrait = (id) => planet.tags[id];
+    return matchAllTraits ? activeTraits.every(hasTrait) : activeTraits.some(hasTrait);
+  };
   matchingPlanets = new Map();
   matching = systems.filter((star) => {
     if (spectral && (star.spectral || 'other') !== spectral) return false;
     if (distanceLimit && (star.distance === null || star.distance > distanceLimit)) return false;
     const hostMatches = !query || star.search.includes(query);
     const planets = star.planets.filter((planet) => (hostMatches || planet.search.includes(query)) &&
-      (!method || planet.discoverymethod === method) && activeTraits.every((id) => planet.tags[id]) &&
+      (!method || planet.discoverymethod === method) && matchesTraits(planet) &&
       (!lifeSearch || (lifeSearch === 'candidate' ? planet.habitability : planet.habitability === lifeSearch)));
     if (!planets.length) return false;
     matchingPlanets.set(star.id, planets);
@@ -297,10 +303,12 @@ $('method').addEventListener('change', updateFilters);
 $('spectral').addEventListener('change', updateFilters);
 $('life-search').addEventListener('change', updateFilters);
 $('distance-limit').addEventListener('change', updateFilters);
+$('trait-match').addEventListener('change', updateFilters);
 
 function resetFilters(nearby = false) {
   $('search').value = $('method').value = $('spectral').value = $('life-search').value = '';
   $('distance-limit').value = nearby ? String(NEARBY_DISTANCE_LY) : '';
+  $('trait-match').value = 'any';
   selectedTraits.clear();
   if (nearby) selectedTraits.add('earth-like');
   for (const button of $('traits').children) button.setAttribute('aria-pressed', String(selectedTraits.has(button.dataset.trait)));
