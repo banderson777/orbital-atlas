@@ -110,6 +110,13 @@ legend,.field,.list-heading h3,.inspector-kicker{font-size:10px;letter-spacing:.
 .measurements span{color:var(--muted);font-size:9px}
 .orbit-frame{position:relative;margin:0 13px;background:radial-gradient(ellipse at center,#21192e,#0a0f1e 70%);border:1px solid #2a3149;border-radius:8px;overflow:hidden}
 .orbit-frame svg{display:block;width:100%;height:auto;max-height:255px}
+.orbit-scaled{position:relative}
+.orbit-placeholders{padding:7px 8px 10px;text-align:center}
+.orbit-scaled+.orbit-placeholders{border-top:1px solid var(--line)}
+.orbit-placeholders p{margin:0;color:var(--muted);font-size:10px}
+.orbit-placeholder-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,100px),1fr));gap:6px}
+.orbit-placeholder{min-width:0;color:var(--text);font-size:11px;overflow-wrap:anywhere}
+.orbit-placeholder svg{max-width:160px;margin:auto}
 .orbit-frame [tabindex]{cursor:pointer}
 .orbit-frame [tabindex]:focus .body,.orbit-frame [tabindex]:hover .body{stroke:#fff;stroke-width:1.5px}
 .orbit-caption{position:absolute;bottom:6px;left:7px;color:#9ba5c2;font:8px Consolas,monospace;pointer-events:none}
@@ -119,7 +126,8 @@ legend,.field,.list-heading h3,.inspector-kicker{font-size:10px;letter-spacing:.
 .planet-row{width:100%;border:0;border-bottom:1px solid #2a3249;background:none;padding:7px 3px;display:grid;grid-template-columns:10px 1fr auto;align-items:center;text-align:left;gap:6px;font-size:11px}
 .planet-row:hover,.planet-row[aria-pressed=true]{background:#201c35}
 .planet-row strong{font-weight:600;overflow-wrap:anywhere}
-.planet-row .planet-note{display:block;color:#64df8e;font-size:10px}
+.planet-row .planet-note{display:block;color:var(--muted);font-size:10px}
+.planet-row .habitable-note{color:#64df8e}
 .planet-row span:last-child{color:var(--muted)}
 .planet-info,.catalog-links{padding:8px 14px 13px;color:var(--muted);font-size:11px}
 .planet-info{border-top:1px solid var(--line);background:#131a2b}

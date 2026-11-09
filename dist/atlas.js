@@ -340,14 +340,45 @@ function starTip(star) {
 }
 
 function planetTip(planet) {
-  const axis = planet.axis ? (planet.axisEstimated ? '≈ ' : '') + numberWithUnit(planet.axis, 'AU', 5) : '—';
+  const orbit = planet.axis
+    ? 'Orbit ' + (planet.axisEstimated ? '≈ ' : '') + numberWithUnit(planet.axis, 'AU', 5)
+    : 'Orbit size unknown';
   return `<strong>${escapeHtml(planet.pl_name)}</strong>Radius ${planet.pl_radelim ? '—' : numberWithUnit(planet.pl_rade, 'R⊕')}
-    · Period ${numberWithUnit(planet.pl_orbper,'d')}<br>Orbit ${axis} · Tₑq ${planet.pl_eqtlim ? '—' : numberWithUnit(planet.pl_eqt,'K',0)}
+    · Period ${numberWithUnit(planet.pl_orbper,'d')}<br>${orbit} · Tₑq ${planet.pl_eqtlim ? '—' : numberWithUnit(planet.pl_eqt,'K',0)}
+    ${!planet.axis && planet.projectedSeparation ? '<br>Projected separation ' + numberWithUnit(planet.projectedSeparation, 'AU', 4) : ''}
     ${planet.habitability ? '<br>' + habitabilityEvidence[planet.habitability] + ' habitability candidate' : ''}`;
+}
+
+function orbitPlanetMarker(planet, index, x, y, color) {
+  const size = positive(planet.pl_rade) && !planet.pl_radelim ? Math.min(6, 2.5 + Math.sqrt(planet.pl_rade)) : 3;
+  return `<g data-object="${index}" tabindex="0" role="button" aria-label="${escapeHtml(planet.pl_name)}" transform="translate(${x} ${y})">
+    <circle r="${Math.max(6,size)}" fill="transparent"/><circle r="${size + 3}" fill="${color}" opacity="${selectedPlanet === planet ? '.36' : '.13'}"/>
+    <circle class="body" r="${size}" fill="${color}"/></g>`;
+}
+
+function renderOrbitPlaceholders(star, planets, matchingInSystem) {
+  return `<section class="orbit-placeholders" aria-label="Planets with unknown orbit sizes">
+    <p>Dashed placeholders · Orbit sizes unknown</p>
+    <div class="orbit-placeholder-grid">${planets.map((planet) => {
+      const color = matchingInSystem.has(planet) ? planet.color : unmatchedPlanetColor;
+      return `<div class="orbit-placeholder">
+        <svg viewBox="0 0 156 136" aria-label="Placeholder for ${escapeHtml(planet.pl_name)}">
+          <g transform="translate(78 68)">
+            <circle class="unknown-orbit" r="54" fill="none" stroke="${color}" stroke-width="${selectedPlanet === planet ? 2 : 1.3}" stroke-dasharray="6 5"/>
+            <g data-object="star" tabindex="0" role="img" aria-label="${escapeHtml(star.name)}">
+              <circle r="13" fill="${star.color}" opacity=".2"/><circle class="body" r="7" fill="${star.color}"/>
+            </g>
+            ${orbitPlanetMarker(planet, star.planets.indexOf(planet), 38, -38, color)}
+          </g>
+        </svg>
+        <span>${escapeHtml(planet.pl_name)}</span>
+      </div>`;
+    }).join('')}</div></section>`;
 }
 
 function renderOrbit(star, matchingInSystem) {
   const known = star.planets.filter((planet) => positive(planet.axis)).sort((a,b) => a.axis - b.axis);
+  const unknown = star.planets.filter((planet) => !positive(planet.axis));
   const min = known[0]?.axis || 1;
   const compression = (axis) => Math.log1p(axis / min);
   const maxExtent = Math.max(1, ...known.map((planet) => compression(planet.axis) * (1 + eccentricity(planet))));
@@ -372,19 +403,18 @@ function renderOrbit(star, matchingInSystem) {
       stroke="${stroke}" stroke-opacity="${habitable ? 1 : highlighted ? .9 : matches ? .72 : .55}" stroke-width="${strokeWidth}"
       ${habitable ? 'class="habitable-orbit"' : ''}
       ${planet.axisEstimated ? 'stroke-dasharray="3 3"' : ''}/>`);
-    const size = positive(planet.pl_rade) && !planet.pl_radelim ? Math.min(6, 2.5 + Math.sqrt(planet.pl_rade)) : 3;
-    bodies.push(`<g data-object="${planetIndex}" tabindex="0" role="button" aria-label="${escapeHtml(planet.pl_name)}" transform="translate(${x} ${y})">
-      <circle r="${Math.max(6,size)}" fill="transparent"/><circle r="${size + 3}" fill="${color}" opacity="${highlighted ? '.36' : '.13'}"/>
-      <circle class="body" r="${size}" fill="${color}"/></g>`);
+    bodies.push(orbitPlanetMarker(planet, planetIndex, x, y, color));
   });
-  return `<div class="orbit-frame" id="orbit-frame"><svg viewBox="0 0 250 221" aria-label="Face-on schematic of the system">
+  const scaled = known.length ? `<div class="orbit-scaled"><svg viewBox="0 0 250 221" aria-label="Face-on schematic of the system">
     <defs><radialGradient id="star-glow"><stop stop-color="${star.color}" stop-opacity=".65"/><stop offset="1" stop-color="${star.color}" stop-opacity="0"/></radialGradient></defs>
     <path d="M19 105h212M125 7v197" stroke="#25243c" stroke-dasharray="2 4"/>
     <g transform="translate(125 105)">${orbits.join('')}${habitableOrbits.join('')}
     <g data-object="star" tabindex="0" role="img" aria-label="${escapeHtml(star.name)}"><circle r="29" fill="url(#star-glow)"/><circle class="body" r="7" fill="${star.color}"/><circle cx="-1.5" cy="-1.5" r="4.2" fill="#fff5e8" opacity=".65"/></g>
     ${bodies.join('')}</g></svg>
     ${habitableOrbits.length ? '<div class="orbit-habitable-key">HABITABLE ZONE ORBIT</div>' : ''}
-    <div class="orbit-caption">${known.length ? 'COMPRESSED ORBIT SCALE' + (known.length < star.planets.length ? ' · ' + (star.planets.length - known.length) + ' UNPLOTTED' : '') : 'ORBIT SIZES UNAVAILABLE'}</div>
+    <div class="orbit-caption">COMPRESSED ORBIT SCALE</div></div>` : '';
+  return `<div class="orbit-frame" id="orbit-frame">${scaled}
+    ${unknown.length ? renderOrbitPlaceholders(star, unknown, matchingInSystem) : ''}
     <div id="orbit-tip" class="tooltip" hidden></div></div>`;
 }
 
@@ -562,7 +592,8 @@ function planetInfo(planet, star) {
     <p>${planet.discoverymethod ? escapeHtml(planet.discoverymethod) + ' · ' + fmt(planet.disc_year,0) : 'Solar System planet'}</p>
     <p>Radius ${planet.pl_radelim ? '—' : numberWithUnit(planet.pl_rade,'R⊕')} · Mass ${mass}${planet.pl_bmassprov ? ' (' + escapeHtml(planet.pl_bmassprov) + ')' : ''}</p>
     <p>Orbit ${orbit} · Period ${numberWithUnit(planet.pl_orbper,'days')}</p>
-    ${planet.projectedSeparation ? '<p>Projected separation ' + numberWithUnit(planet.projectedSeparation,'AU',4) + '</p>' : ''}
+    ${planet.projectedSeparation ? '<p>Projected separation ' + numberWithUnit(planet.projectedSeparation,'AU',4) +
+      referenceLink(planet.pl_orbsmax_reflink, 'Separation source') + '</p>' : ''}
     <p>Tₑq ${planet.pl_eqtlim ? '—' : numberWithUnit(planet.pl_eqt,'K',0)} · Flux ${planet.fluxEstimated ? '≈ ' : ''}${numberWithUnit(planet.flux,'S⊕')}</p>
     ${flags ? '<p>' + flags + '</p>' : ''}
     ${planet.discoverymethod ? '<p>Probability of life · Unknown</p>' : ''}
@@ -588,10 +619,10 @@ function renderDetail() {
       const matches = matchingInSystem.has(planet);
       const habitable = planetInHabitableZone(star, planet);
       const note = [habitable ? 'Habitable zone' : '', matches ? '' : 'Outside filters',
-        habitable && !positive(planet.axis) ? 'Orbit size unavailable' : ''].filter(Boolean).join(' · ');
+        !positive(planet.axis) ? 'Orbit size unknown' : ''].filter(Boolean).join(' · ');
       return `<div class="compare-item"><button class="planet-row${matches ? '' : ' outside-filter'}" data-object="${index}" aria-pressed="${selectedPlanet === planet}">
       <i class="star-dot" data-dot="${matches ? planet.color : unmatchedPlanetColor}"></i><span class="planet-name"><strong>${escapeHtml(planet.pl_name)}</strong>
-      ${note ? '<small class="planet-note">' + note + '</small>' : ''}</span>
+      ${note ? '<small class="planet-note' + (habitable ? ' habitable-note' : '') + '">' + note + '</small>' : ''}</span>
       <span>${planet.axis ? (planet.axisEstimated ? '≈' : '') + numberWithUnit(planet.axis,'AU',4) : '—'}</span></button>
       ${compareToggle(star, planet)}</div>`;
     }).join('')}</div>
@@ -604,7 +635,7 @@ function renderDetail() {
 
 function showOrbitTip(target) {
   const frame = $('orbit-frame');
-  const marker = frame.querySelector(`[data-object="${target.dataset.object}"]`);
+  const marker = target.closest('svg') ? target : frame.querySelector(`[data-object="${target.dataset.object}"]`);
   const rect = frame.getBoundingClientRect();
   const body = marker?.getBoundingClientRect();
   const item = target.dataset.object === 'star' ? null : selected.planets[Number(target.dataset.object)];
