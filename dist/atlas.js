@@ -33,6 +33,10 @@ const traits = [
 ];
 const trappistHZ = new Set(['TRAPPIST-1 e', 'TRAPPIST-1 f', 'TRAPPIST-1 g']);
 const trappistHZSource = 'https://science.nasa.gov/asset/webb/trappist-1-system-orbit-comparison/';
+const hzModelSource = 'https://doi.org/10.1088/2041-8205/787/2/L29';
+const nasaCalculated = 'https://exoplanetarchive.ipac.caltech.edu/docs/pscp_calc.html';
+const referenceHosts = new Set(['exoplanetarchive.ipac.caltech.edu', 'exofop.ipac.caltech.edu',
+  'ui.adsabs.harvard.edu', 'www.nature.com', 'doi.org', 'science.nasa.gov']);
 const innerHZ = [1.107, 1.332e-4, 1.58e-8, -8.308e-12, -1.931e-15];
 const outerHZ = [0.356, 6.171e-5, 1.698e-9, -3.198e-12, -5.575e-16];
 const habitabilityEvidence = {
@@ -339,7 +343,56 @@ function eccentricity(planet) {
   return Number.isFinite(planet.pl_orbeccen) && planet.pl_orbeccen >= 0 && planet.pl_orbeccen < 1 ? planet.pl_orbeccen : 0;
 }
 
-function planetInfo(planet) {
+function referenceLink(value, label = 'Source') {
+  if (!value) return '';
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    return '';
+  }
+  if (url.protocol !== 'https:' || !referenceHosts.has(url.host) || url.username || url.password) return '';
+  return ` <a target="_blank" rel="noopener noreferrer" href="${escapeHtml(url.href)}">${escapeHtml(label)} ↗</a>`;
+}
+
+function measurementEvidence(label, value, source, description) {
+  const origin = description || (source === nasaCalculated ? 'NASA calculated' : source ? 'Catalog source' : 'Source unavailable');
+  return `<li>${label} ${value} <span>· ${origin}</span>${referenceLink(source, label + ' source')}</li>`;
+}
+
+function lifeEvidence(planet, star) {
+  const density = planet.pl_denslim ? null : planet.pl_dens;
+  const massType = { Mass:'Reported mass', Msini:'Minimum mass', 'Msin(i)/sin(i)':'Inclination-corrected mass',
+    'M-R relationship':'Estimated from radius' };
+  const trappist = trappistHZ.has(planet.pl_name);
+  const range = trappist ? 'NASA places this orbit in the habitable zone.' :
+    `The model’s flux range at this stellar temperature is ${fmt(hzBoundary(outerHZ, star.st_teff), 3)}–${fmt(hzBoundary(innerHZ, star.st_teff), 3)} S⊕.`;
+  const evidence = [
+    measurementEvidence('Radius', numberWithUnit(planet.pl_rade, 'R⊕'), planet.pl_rade_reflink),
+    positive(density) ? measurementEvidence('Bulk density', numberWithUnit(density, 'g/cm³'), planet.pl_dens_reflink) :
+      '<li>Bulk density unavailable for the screen</li>',
+    positive(planet.pl_bmasse) && !planet.pl_bmasselim
+      ? measurementEvidence('Mass', numberWithUnit(planet.pl_bmasse, 'M⊕'), planet.pl_bmasse_reflink,
+        Object.hasOwn(massType, planet.pl_bmassprov) ? massType[planet.pl_bmassprov] : null) : '',
+    positive(planet.flux) ? measurementEvidence('Stellar flux', numberWithUnit(planet.flux, 'S⊕', 3),
+      planet.fluxEstimated ? null : planet.pl_insol_reflink,
+      planet.fluxEstimated ? 'Atlas estimate from luminosity and orbit size' : null) : '',
+    planet.fluxEstimated ? measurementEvidence('Stellar luminosity', numberWithUnit(star.st_lum, 'log L☉', 3), star.st_lum_reflink) : '',
+    planet.fluxEstimated && planet.axisEstimated
+      ? measurementEvidence('Orbital period', numberWithUnit(planet.pl_orbper, 'days'), planet.pl_orbper_reflink) +
+        measurementEvidence('Stellar mass', numberWithUnit(star.st_mass, 'M☉'), star.st_mass_reflink)
+      : planet.fluxEstimated ? measurementEvidence('Orbit size', numberWithUnit(planet.axis, 'AU', 4), planet.pl_orbsmax_reflink) : '',
+    measurementEvidence('Stellar temperature', numberWithUnit(star.st_teff, 'K', 0), star.st_teff_reflink),
+  ];
+  const composition = planet.habitability === 'density'
+    ? 'Radius is over 0.5 and up to 2 R⊕, with a reported mass and density of at least 3.5 g/cm³.'
+    : 'Radius is over 0.5 and up to 1.6 R⊕. The density evidence is limited.';
+  return `<section class="life-evidence"><h5>Why it qualifies · ${habitabilityEvidence[planet.habitability]}</h5>
+    <p>${composition}</p><ul>${evidence.join('')}</ul>
+    <p>${range}${referenceLink(trappist ? trappistHZSource : hzModelSource, 'Habitable zone source')}</p></section>`;
+}
+
+function planetInfo(planet, star) {
   const mass = numberWithUnit(planet.pl_bmasse, 'M⊕');
   const orbit = planet.axis ? (planet.axisEstimated ? '≈ ' : '') + numberWithUnit(planet.axis, 'AU', 5) : '—';
   const flags = traits.filter((t) => planet.tags[t.id]).map((t) => t.label).join(' · ');
@@ -350,11 +403,10 @@ function planetInfo(planet) {
     ${planet.projectedSeparation ? '<p>Projected separation ' + numberWithUnit(planet.projectedSeparation,'AU',4) + '</p>' : ''}
     <p>Tₑq ${planet.pl_eqtlim ? '—' : numberWithUnit(planet.pl_eqt,'K',0)} · Flux ${planet.fluxEstimated ? '≈ ' : ''}${numberWithUnit(planet.flux,'S⊕')}</p>
     ${flags ? '<p>' + flags + '</p>' : ''}
-    ${planet.habitability ? '<p>Habitability candidate · ' + habitabilityEvidence[planet.habitability] + '</p>' : ''}
-    ${planet.habitability === 'density' ? '<p>Bulk density ' + numberWithUnit(planet.pl_dens, 'g/cm³') + '</p>' : ''}
     ${planet.discoverymethod ? '<p>Probability of life · Unknown</p>' : ''}
+    ${planet.habitability ? lifeEvidence(planet, star) : ''}
     ${planet.tags.water ? '<a target="_blank" rel="noopener" href="' + evidence[planet.pl_name] + '">Water vapor source ↗</a>' : ''}
-    ${trappistHZ.has(planet.pl_name) ? '<a target="_blank" rel="noopener" href="' + trappistHZSource + '">Habitable zone source ↗</a>' : ''}</div>`;
+    ${!planet.habitability && trappistHZ.has(planet.pl_name) ? referenceLink(trappistHZSource, 'Habitable zone source') : ''}</div>`;
 }
 
 function renderDetail() {
@@ -372,7 +424,7 @@ function renderDetail() {
     <div class="planet-list">${star.planets.map((planet, index) =>
       `<button class="planet-row${matchingInSystem && !matchingInSystem.includes(planet) ? ' outside-filter' : ''}" data-object="${index}" aria-pressed="${selectedPlanet === planet}">
       <i class="star-dot" data-dot="${planet.color}"></i><strong>${escapeHtml(planet.pl_name)}</strong><span>${planet.axis ? (planet.axisEstimated ? '≈' : '') + numberWithUnit(planet.axis,'AU',4) : '—'}</span></button>`).join('')}</div>
-    ${selectedPlanet ? planetInfo(selectedPlanet) : ''}
+    ${selectedPlanet ? planetInfo(selectedPlanet, star) : ''}
     <div class="catalog-links">${star === solar ? '<a href="https://science.nasa.gov/solar-system/planets/" target="_blank" rel="noopener">Solar System reference ↗</a>'
       : `<a href="https://exoplanetarchive.ipac.caltech.edu/overview/${encodeURIComponent(star.name)}" target="_blank" rel="noopener">Open NASA catalog entry ↗</a>`}</div>`;
   colorDots(detail);

@@ -115,6 +115,11 @@ legend,.field,.list-heading h3,.inspector-kicker{font-size:10px;letter-spacing:.
 .planet-info h4{margin:0 0 6px;color:var(--text)}
 .planet-info p{margin:5px 0}
 .planet-info a{display:inline-block;margin-top:5px}
+.life-evidence{border-top:1px solid var(--line);margin-top:8px;padding-top:8px}
+.life-evidence h5{margin:0;color:var(--text);font-size:11px}
+.life-evidence ul{padding-left:15px;margin:6px 0}
+.life-evidence li{margin:3px 0}
+.life-evidence a{display:inline;margin-top:0}
 .tooltip{z-index:4;position:absolute;max-width:min(220px,93%);padding:7px 9px;border:1px solid #565175;border-radius:6px;background:#10172af5;box-shadow:0 4px 15px #0009;pointer-events:none;color:#c9d2eb;font-size:11px;line-height:1.55}
 .tooltip strong{color:#fff;display:block;margin-bottom:2px}
 .foot{display:flex;justify-content:space-between;gap:12px;padding:12px 0 16px;font-size:10px;color:var(--dim)}
