@@ -4,6 +4,8 @@ Orbital Atlas is a buildless star chart for the confirmed planets in the NASA Ex
 
 Drag to rotate and scroll or pinch to zoom. Hold Shift while dragging to pan. The canvas accepts the arrow keys, plus, minus, and Home. Use the catalog to search and select a host, including systems missing a 3D position. Click a planet in the system panel for details and hover over stars or planets for measurements.
 
+Use **Copy view link** below the chart to capture the filters, chart view, selected system, and comparison. Links to the hosted atlas use its existing access controls. Links created from the offline copy refer to that file on your computer.
+
 ## Refresh the NASA catalog
 
 Run `python3 refresh_catalog.py --check` with Python 3.9 or later and internet access. It lists added and removed names and changed fields for both hosts and planets without writing the snapshot. Run `python3 refresh_catalog.py` to replace `dist/catalog.js` after review. To check and apply the same previously saved TAP JSON response, pass `--input PATH --date YYYY-MM-DD` to both commands.

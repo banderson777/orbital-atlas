@@ -84,7 +84,12 @@
           <div class="map-bottom"><div class="scale"><span id="scale-label"></span><div id="scale-bar"></div></div><div class="legend"><span><i></i> Catalog host</span><span><i></i> Sol</span><span><i></i> Selected</span></div></div>
           <div id="map-tip" class="tooltip" hidden></div>
         </div>
-        <div class="map-footer"><span>Drag to rotate <b>·</b> Scroll to zoom <b>·</b> Shift + drag to pan</span><span id="map-notice">Select a star to inspect its system</span></div>
+        <div class="map-footer">
+          <span>Drag to rotate <b>·</b> Scroll to zoom <b>·</b> Shift + drag to pan</span>
+          <span id="map-notice">Select a star to inspect its system</span>
+          <button id="copy-view" class="quiet">Copy view link</button>
+          <span id="copy-view-status" role="status"></span>
+        </div>
       </section>
 
       <aside class="panel inspector" id="inspector" aria-label="Selected planetary system">
@@ -94,6 +99,13 @@
     </div>
     <footer class="foot"><span><a href="https://exoplanetarchive.ipac.caltech.edu/docs/API_PS_columns.html" target="_blank" rel="noopener">NASA Exoplanet Archive</a> <b>·</b> <span id="snapshot-date"></span></span><span id="position-note"></span></footer>
   </main>
+
+  <dialog id="view-link-dialog" aria-labelledby="view-link-title">
+    <form method="dialog"><button class="quiet close" aria-label="Close view link">×</button></form>
+    <h2 id="view-link-title">Copy view link</h2>
+    <p>Press Ctrl+C or use your browser’s copy command to copy the selected address.</p>
+    <label class="field">VIEW ADDRESS<input id="view-link" type="text" readonly spellcheck="false"></label>
+  </dialog>
 
   <dialog id="compare" aria-labelledby="compare-title">
     <form method="dialog"><button class="quiet close" aria-label="Close comparison">×</button></form>

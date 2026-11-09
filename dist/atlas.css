@@ -93,7 +93,10 @@ legend,.field,.list-heading h3,.inspector-kicker{font-size:10px;letter-spacing:.
 .legend span:nth-child(2) i{background:#ffc478;box-shadow:0 0 7px #ffc478}
 .legend span:nth-child(3) i{background:#82e3d1;box-shadow:0 0 7px #82e3d1}
 .scale div{border:1px solid #a1a9c3;border-top:0;height:5px;margin-top:2px}
-.map-footer{padding:9px 12px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:8px;color:var(--muted);font-size:10px}
+.map-footer{padding:9px 12px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--muted);font-size:10px}
+.map-footer button{white-space:nowrap;font-size:10px;padding:4px 6px}
+#copy-view-status{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+#view-link{display:block;width:100%;margin-top:5px;padding:8px;border:1px solid var(--line);border-radius:6px;background:#0b1120;color:var(--text);font-size:12px}
 .map-footer b,.foot b{color:#6d618f;margin:0 3px}
 .inspector>.section-head{min-height:61px;padding:0 14px;border-bottom:1px solid var(--line)}
 .inspector-kicker{color:var(--accent);font-size:9px}
@@ -138,7 +141,7 @@ dialog p,dialog dd{color:#b9c2dc}
 dialog dt{font-weight:700;margin-top:9px}
 dialog dd{margin:1px 0}
 dialog .close{float:right;font-size:19px;line-height:1;padding:4px 7px}
-@media(max-width:1140px){.workspace{grid-template-columns:190px minmax(290px,1fr) 245px;gap:10px}.explorer-controls{padding-inline:10px}.map-footer span:last-child{display:none}}
+@media(max-width:1140px){.workspace{grid-template-columns:190px minmax(290px,1fr) 245px;gap:10px}.explorer-controls{padding-inline:10px}#map-notice{display:none}}
 @media(max-width:900px){.workspace{grid-template-columns:minmax(180px,220px) minmax(0,1fr)}.inspector{grid-column:1/-1;height:auto;min-height:360px}.inspector #system-detail{display:grid;grid-template-columns:minmax(220px,310px) 1fr;grid-auto-rows:min-content}.system-heading,.measurements,.orbit-frame{grid-column:1}.orbit-frame{grid-row:3/span 4;margin-bottom:13px}.planet-title,.planet-list,.planet-info,.catalog-links{grid-column:2}.planet-title{grid-row:1}.planet-list{grid-row:2/span 2}.planet-info{grid-row:4}.catalog-links{grid-row:5}}
 @media(max-width:600px){.top{height:60px}.brand img{width:34px;height:34px}.source{display:none}.intro{display:block;padding:22px 0 16px}.stats{margin-top:14px;gap:14px}.stats div{padding:0 0 0 10px}.stats strong{font-size:22px}.stats span{font-size:8px}.workspace{display:flex;flex-direction:column}.panel{width:100%}.map-panel{order:0;height:465px}.explorer{order:1;height:550px}.inspector{order:2}.inspector #system-detail{display:block}.orbit-frame svg{max-height:225px}.foot{flex-wrap:wrap}.map-bottom{font-size:9px}}
 .planet-row.outside-filter strong,.planet-row.outside-filter .planet-note{color:var(--muted)}

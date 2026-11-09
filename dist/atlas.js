@@ -255,11 +255,12 @@ function colorDots(container) {
   }
 }
 
-function selectStar(star, reveal = true) {
+function selectStar(star, reveal = true, planet) {
   if (!star) return;
   selected = star;
   const planets = matchingPlanets.get(star.id);
-  selectedPlanet = planets?.length === 1 && ($('life-search').value || star.planets.length > 1) ? planets[0] : null;
+  selectedPlanet = planet !== undefined ? planet :
+    planets?.length === 1 && ($('life-search').value || star.planets.length > 1) ? planets[0] : null;
   for (const result of $('results').querySelectorAll('.result[aria-current=true]')) result.setAttribute('aria-current','false');
   $('results').querySelector(`[data-star="${star.id}"]`)?.setAttribute('aria-current','true');
   renderDetail();
@@ -1034,16 +1035,108 @@ canvas.addEventListener('keydown',(event) => {
 $('zoom-in').addEventListener('click',() => zoom(.73));
 $('zoom-out').addEventListener('click',() => zoom(1.37));
 $('recenter').addEventListener('click',resetCamera);
-for (const button of document.querySelectorAll('[data-view]')) {
-  button.addEventListener('click', () => {
-    camera.view = button.dataset.view;
-    for (const mode of document.querySelectorAll('[data-view]')) {
-      mode.setAttribute('aria-pressed', String(mode === button));
-    }
-    $('map-mode').textContent = camera.view === 'sol' ? 'LOCAL NEIGHBORHOOD' : 'GALACTIC OVERVIEW';
-    resetCamera();
-  });
+
+const mapModes = document.querySelectorAll('[data-view]');
+function setMapView(view) {
+  camera.view = view;
+  for (const button of mapModes) button.setAttribute('aria-pressed', String(button.dataset.view === view));
+  $('map-mode').textContent = view === 'sol' ? 'LOCAL NEIGHBORHOOD' : 'GALACTIC OVERVIEW';
+  resetCamera();
 }
+for (const button of mapModes) button.addEventListener('click', () => setMapView(button.dataset.view));
+
+const viewFilters = {
+  method: 'method',
+  spectral: 'spectral',
+  life: 'life-search',
+  distance: 'distance-limit',
+  match: 'trait-match',
+};
+
+function viewLink() {
+  const params = new URLSearchParams({ v:'1', system:selected.name, map:camera.view });
+  if ($('search').value) params.set('q', $('search').value);
+  for (const [key, id] of Object.entries(viewFilters)) {
+    if ($(id).value) params.set(key, $(id).value);
+  }
+  for (const trait of selectedTraits) params.append('trait', trait);
+  if (selectedPlanet) params.set('planet', selectedPlanet.pl_name);
+  for (const planet of comparison.keys()) params.append('compare', planet.pl_name);
+  params.set('camera', [camera.yaw % TAU, camera.pitch, camera.radius, camera.panX, camera.panY].join(','));
+  const url = new URL(window.location.href);
+  url.hash = params.toString();
+  return url.href;
+}
+
+function restoreView() {
+  const fragment = window.location.hash.slice(1);
+  if (fragment.length > 12000) return false;
+  const params = new URLSearchParams(fragment);
+  if (params.get('v') !== '1') return false;
+  $('search').value = params.get('q') || '';
+  for (const [key, id] of Object.entries(viewFilters)) {
+    const control = $(id);
+    const value = params.get(key);
+    control.value = [...control.options].some((option) => option.value === value) ? value : control.options[0].value;
+  }
+  const requestedTraits = new Set(params.getAll('trait'));
+  selectedTraits.clear();
+  for (const button of $('traits').children) {
+    const active = requestedTraits.has(button.dataset.trait);
+    if (active) selectedTraits.add(button.dataset.trait);
+    button.setAttribute('aria-pressed', String(active));
+  }
+  comparison.clear();
+  for (const name of params.getAll('compare').slice(0, COMPARE_LIMIT)) {
+    const star = systems.find((host) => host.planets.some((planet) => planet.pl_name === name)) ?? solar;
+    const planet = star.planets.find((candidate) => candidate.pl_name === name);
+    if (planet) comparison.set(planet, star);
+  }
+  setMapView(params.get('map') === 'galaxy' ? 'galaxy' : 'sol');
+  const framing = (params.get('camera') || '').split(',');
+  if (framing.length === 5 && framing.every((value) => value.trim() && Number.isFinite(Number(value)))) {
+    const [yaw, pitch, radius, panX, panY] = framing.map(Number);
+    if (Math.abs(yaw) <= TAU && Math.abs(pitch) <= Math.PI / 2 &&
+        radius >= .65 && radius <= 83000 && Math.abs(panX) <= 1e7 && Math.abs(panY) <= 1e7) {
+      Object.assign(camera, {yaw, pitch, radius, panX, panY});
+    }
+  }
+  updateFilters();
+  const name = params.get('system');
+  const star = name === solar.name ? solar : systems.find((host) => host.name === name);
+  if (star) {
+    const planet = star.planets.find((candidate) => candidate.pl_name === params.get('planet'));
+    selectStar(star, false, planet ?? null);
+  }
+  updateComparison();
+  return true;
+}
+
+let copyFeedbackTimer;
+$('copy-view').addEventListener('click', async () => {
+  const link = viewLink();
+  try {
+    await navigator.clipboard.writeText(link);
+  } catch {
+    const field = $('view-link');
+    field.value = link;
+    if (!$('view-link-dialog').open) $('view-link-dialog').showModal();
+    field.focus();
+    field.select();
+    return;
+  }
+  $('copy-view').textContent = 'Link copied';
+  $('copy-view-status').textContent = 'View link copied to clipboard';
+  clearTimeout(copyFeedbackTimer);
+  copyFeedbackTimer = setTimeout(() => {
+    $('copy-view').textContent = 'Copy view link';
+    $('copy-view-status').textContent = '';
+  }, 2500);
+});
+
 new ResizeObserver(scheduleDraw).observe($('sky'));
-resetCamera();
-updateFilters();
+if (!restoreView()) {
+  resetCamera();
+  updateFilters();
+}
+window.addEventListener('hashchange', restoreView);
