@@ -25,19 +25,26 @@ TEXT_FIELDS = {"hostname", "pl_name", "st_spectype", "discoverymethod", "pl_bmas
 
 
 class NoRedirects(HTTPRedirectHandler):
+    """Keep catalog downloads on the configured NASA TAP endpoint."""
+
     def redirect_request(self, req, fp, code, msg, headers, newurl):
+        """Decline redirects so the HTTP handler raises an error."""
         return None
 
 
 class ReferenceLink(HTMLParser):
+    """Extract an href from the archive's reference markup."""
+
     href = None
 
     def handle_starttag(self, tag, attrs):
+        """Record the href from the first anchor that supplies one."""
         if tag == "a" and self.href is None:
             self.href = dict(attrs).get("href")
 
 
 def reference_url(value):
+    """Return an approved HTTPS citation URL, or None for unusable markup."""
     if not isinstance(value, str) or len(value) > 2048:
         return None
     parser = ReferenceLink()
@@ -55,6 +62,11 @@ def reference_url(value):
 
 
 def read_rows(source):
+    """Read a size-bounded TAP JSON response from a binary stream.
+
+    Return the rows as a list. Raise ValueError if the payload exceeds the
+    size limit, contains invalid JSON, or has an unexpected shape or row count.
+    """
     payload = source.read(MAX_RESPONSE_BYTES + 1)
     if len(payload) > MAX_RESPONSE_BYTES:
         raise ValueError("Catalog exceeds the maximum download size.")
@@ -65,6 +77,11 @@ def read_rows(source):
 
 
 def validate_row(row, index):
+    """Raise ValueError if a row's required fields or types are invalid.
+
+    The index is the one-based row number used in error messages. Citation
+    fields are optional and are sanitized separately.
+    """
     if not isinstance(row, dict):
         raise ValueError(f"Catalog row {index} must be an object.")
     for key in HOST + PLANET:
@@ -85,6 +102,7 @@ def validate_row(row, index):
 
 
 def index_snapshot(snapshot):
+    """Return host and planet dictionaries keyed by catalog names."""
     hosts = {}
     planets = {}
     for star, members in snapshot["systems"]:
@@ -98,6 +116,11 @@ def index_snapshot(snapshot):
 
 
 def report_changes(previous, current, detail):
+    """Print additions, removals, and changes to shared fields.
+
+    With detail enabled, list the affected names and changed field names.
+    Report newly introduced fields separately from changes to existing values.
+    """
     print(f"Snapshot {previous['date']} → {current['date']}")
     for label, old, new in zip(("Hosts", "Planets"), index_snapshot(previous), index_snapshot(current)):
         added = sorted(new.keys() - old.keys())
@@ -120,6 +143,11 @@ def report_changes(previous, current, detail):
 
 
 def main():
+    """Fetch or read a TAP snapshot, validate it, and report changes.
+
+    Check mode preserves the current catalog. Write mode stages the validated
+    data beside the current file and replaces it only after the write succeeds.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, help="Use a previously downloaded TAP JSON response")
     parser.add_argument("--date", type=date.fromisoformat, help="Snapshot date for a previously downloaded response")

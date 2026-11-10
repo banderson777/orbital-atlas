@@ -1,3 +1,12 @@
+/**
+ * HTTP handler for the hosted atlas.
+ *
+ * build_worker.py prepends the asset table when generating the entry point.
+ * Sites checks visitor access upstream. This handler serves the chart files
+ * and applies security headers to both successful and error responses.
+ * @file
+ */
+
 const securityHeaders = {
   'Content-Security-Policy': "frame-ancestors 'none'",
   'X-Content-Type-Options': 'nosniff',
@@ -7,6 +16,11 @@ const securityHeaders = {
 };
 
 export default {
+  /**
+   * Serve a bundled asset for GET or return its headers for HEAD.
+   * @param {Request} request - Incoming request from the Sites runtime.
+   * @returns {Response} The asset response or an HTTP error.
+   */
   fetch(request) {
     const head = request.method === 'HEAD';
     const headers = new Headers(securityHeaders);

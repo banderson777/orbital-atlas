@@ -1,6 +1,49 @@
 'use strict';
 
+/**
+ * Browser entry point for Orbital Atlas.
+ *
+ * The bundled catalog loads first. This script expands its rows into shared
+ * host and planet records for the filters, Canvas chart, SVG system inspector,
+ * and comparison table. Saved views travel in the URL fragment.
+ * @file
+ */
+
+/**
+ * A catalog snapshot emitted by refresh_catalog.py.
+ * @typedef {Object} CatalogSnapshot
+ * @property {string} date - Snapshot date in YYYY-MM-DD format.
+ * @property {string[]} hostFields - Field names in host row order.
+ * @property {string[]} planetFields - Field names in planet row order.
+ * @property {Array<Array>} systems - Pairs of one host row and its planet rows.
+ */
+
+/**
+ * A decoded planet with display fields added by preparePlanet.
+ * @typedef {Object} AtlasPlanet
+ * @property {string} pl_name - Catalog planet name used in saved links.
+ * @property {?number} axis - Usable orbital semi-major axis in AU.
+ * @property {boolean} [axisEstimated] - Whether the atlas derived the axis.
+ * @property {?number} [projectedSeparation] - Cataloged sky-plane separation in AU.
+ * @property {?number} [flux] - Incident stellar flux in Earth units.
+ * @property {boolean} [fluxEstimated] - Whether the atlas derived the flux.
+ * @property {Object.<string, boolean>} tags - Trait matches used by the filter controls.
+ * @property {?string} [habitability] - Density or radius evidence tier when the planet qualifies.
+ * @property {string} color - Display color before filters are applied.
+ */
+
+/**
+ * A decoded host and its planets.
+ * @typedef {Object} AtlasHost
+ * @property {number} id - Snapshot-local identifier for UI events.
+ * @property {string} name - Host name used in saved links.
+ * @property {?number} distance - Distance from Sol in light-years.
+ * @property {?number[]} position - Sol-centered Galactic coordinates in light-years.
+ * @property {AtlasPlanet[]} planets - All planets in the system.
+ */
+
 const $ = (id) => document.getElementById(id);
+/** Escape catalog text before inserting it into HTML or quoted attributes. */
 const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (char) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const fmt = (n, digits = 2) => Number.isFinite(n)
@@ -51,6 +94,12 @@ const massType = { Mass:'Reported mass', Msini:'Minimum mass', 'Msin(i)/sin(i)':
 const comparison = new Map();
 const COMPARE_LIMIT = 3;
 
+/**
+ * Evaluate a Kopparapu habitable-zone boundary for an Earth-mass planet.
+ * @param {number[]} coefficients - Polynomial coefficients in ascending order.
+ * @param {number} temperature - Host effective temperature in kelvin.
+ * @returns {number} Boundary flux relative to Earth's incident stellar flux.
+ */
 function hzBoundary(coefficients, temperature) {
   const t = temperature - 5780;
   return coefficients.reduceRight((value, coefficient) => value * t + coefficient, 0);
@@ -77,6 +126,11 @@ function stellarClass(star) {
   return luminosity && stages[luminosity] ? starNames[spectral] + ' ' + stages[luminosity] : spectral + '-type star';
 }
 
+/**
+ * Rotate catalog sky coordinates into a Sol-centered Galactic frame.
+ * @param {Object} star - Host row with right ascension and declination in degrees and distance in parsecs.
+ * @returns {?number[]} Galactic x, y, and z in light-years, or null if the position is incomplete.
+ */
 function galacticPosition(star) {
   if (!positive(star.sy_dist) || !Number.isFinite(star.ra) || !Number.isFinite(star.dec)) return null;
   const ra = star.ra * DEG, dec = star.dec * DEG, distance = star.sy_dist * LY_PER_PC;
@@ -91,6 +145,16 @@ function galacticPosition(star) {
   ];
 }
 
+/**
+ * Add geometry, evidence, and display metadata to a decoded planet row in place.
+ *
+ * Imaging and microlensing separations are tracked separately from orbit size.
+ * A single-star system with period and stellar mass can supply an estimated
+ * axis. Flux falls back to luminosity divided by the square of that axis.
+ * @param {Object} planet - Decoded NASA planet row to enrich.
+ * @param {Object} star - Decoded host row with stellar measurements.
+ * @returns {AtlasPlanet} The enriched input object.
+ */
 function preparePlanet(planet, star) {
   const radius = planet.pl_radelim ? null : planet.pl_rade;
   const density = planet.pl_denslim ? null : planet.pl_dens;
@@ -120,6 +184,13 @@ function preparePlanet(planet, star) {
   return planet;
 }
 
+/**
+ * Assign the Life Search evidence tier from the habitable-zone and rocky-world screens.
+ * @param {Object} planet - Planet row with its habitable-zone and rocky tags set.
+ * @param {?number} radius - Usable radius in Earth radii.
+ * @param {?number} density - Usable bulk density in grams per cubic centimeter.
+ * @returns {?string} The density or radius tier, or null outside the shortlist.
+ */
 function classifyHabitability(planet, radius, density) {
   if (!planet.tags.hz || !(radius > 0.5 && radius <= 2)) return null;
   const reportedMass = ['Mass', 'Msin(i)/sin(i)'].includes(planet.pl_bmassprov);
@@ -131,6 +202,7 @@ function fields(keys, values) {
   return Object.fromEntries(keys.map((key, index) => [key, values[index]]));
 }
 
+/** @type {CatalogSnapshot} */
 const catalog = window.ATLAS_CATALOG;
 const systems = catalog.systems.map(([starRow, planetRows], index) => {
   const star = fields(catalog.hostFields, starRow);
@@ -185,6 +257,13 @@ for (const method of methods) $('method').add(new Option(method, method));
 for (const spectral of 'OBAFGKMLTY') $('spectral').add(new Option(spectral + ' class', spectral));
 $('spectral').add(new Option('Other / unlisted', 'other'));
 
+/**
+ * Rebuild the nearest-first host results and the matching planet set for each host.
+ *
+ * Any/All applies only to the trait buttons. Search, Life Search, and discovery
+ * method further constrain the same planet. Distance and spectral class apply
+ * to its host. The matching planet set also drives inspector colors.
+ */
 function updateFilters() {
   const query = normalize($('search').value);
   const method = $('method').value;
@@ -255,6 +334,12 @@ function colorDots(container) {
   }
 }
 
+/**
+ * Select a host, refresh its inspector, and optionally bring it into view.
+ * @param {AtlasHost} star - Host to show.
+ * @param {boolean} [reveal=true] - Reframe an offscreen host and scroll to the inspector on narrow screens.
+ * @param {?AtlasPlanet} [planet] - Explicit planet selection. Null clears it. Omit to use automatic selection.
+ */
 function selectStar(star, reveal = true, planet) {
   if (!star) return;
   selected = star;
@@ -356,6 +441,13 @@ function orbitPlanetMarker(planet, index, x, y, color) {
     <circle class="body" r="${size}" fill="${color}"/></g>`;
 }
 
+/**
+ * Draw independent placeholder rings for planets with unknown orbit sizes.
+ * @param {AtlasHost} star - Host shown at the center of each ring.
+ * @param {AtlasPlanet[]} planets - Planets without a usable axis.
+ * @param {Set<AtlasPlanet>} matchingInSystem - Planets that retain their trait colors.
+ * @returns {string} Markup with schematic rings and interactive planet markers.
+ */
 function renderOrbitPlaceholders(star, planets, matchingInSystem) {
   return `<section class="orbit-placeholders" aria-label="Planets with unknown orbit sizes">
     <p>Dashed placeholders · Orbit sizes unknown</p>
@@ -376,6 +468,15 @@ function renderOrbitPlaceholders(star, planets, matchingInSystem) {
     }).join('')}</div></section>`;
 }
 
+/**
+ * Render the system's schematic SVG orbits and unscaled placeholders.
+ *
+ * All usable axes contribute to the logarithmic display scale, even when
+ * filters gray out a planet. Unknown sizes are shown in their own diagram.
+ * @param {AtlasHost} star - System whose orbits are displayed.
+ * @param {Set<AtlasPlanet>} matchingInSystem - Planets that retain their trait colors.
+ * @returns {string} Inspector markup with orbit paths, markers, and a tooltip container.
+ */
 function renderOrbit(star, matchingInSystem) {
   const known = star.planets.filter((planet) => positive(planet.axis)).sort((a,b) => a.axis - b.axis);
   const unknown = star.planets.filter((planet) => !positive(planet.axis));
@@ -422,6 +523,12 @@ function eccentricity(planet) {
   return Number.isFinite(planet.pl_orbeccen) && planet.pl_orbeccen >= 0 && planet.pl_orbeccen < 1 ? planet.pl_orbeccen : 0;
 }
 
+/**
+ * Build an escaped citation link for an approved HTTPS reference.
+ * @param {?string} value - Reference URL, which may be absent.
+ * @param {string} [label=Source] - Link text.
+ * @returns {string} Link markup, or an empty string for an unavailable or rejected URL.
+ */
 function referenceLink(value, label = 'Source') {
   if (!value) return '';
   let url;
@@ -510,6 +617,7 @@ function catalogOverview(star) {
   return 'https://exoplanetarchive.ipac.caltech.edu/overview/' + encodeURIComponent(star.name);
 }
 
+/** Rebuild the comparison table in selection order and update the header count. */
 function renderComparison() {
   const entries = [...comparison];
   $('compare-count').textContent = entries.length + '/' + COMPARE_LIMIT;
@@ -697,6 +805,12 @@ function resetCamera() {
   scheduleDraw();
 }
 
+/**
+ * Project a 3D position through the current chart camera.
+ * @param {number[]} position - Cartesian x, y, and z in light-years.
+ * @param {boolean} [galactic=false] - Whether the input already uses the chart's current origin.
+ * @returns {number[]} Canvas x and y in CSS pixels followed by view depth in light-years.
+ */
 function project([x,y,z], galactic = false) {
   if (!galactic && camera.view === 'galaxy') x += SUN_X;
   const xx = x * chart.cosYaw - y * chart.sinYaw;
@@ -855,6 +969,7 @@ function drawLabel(text,x,y,color, side = 1) {
   context.textAlign = 'left';
 }
 
+/** Paint one chart frame and cache the visible marker positions for pointer hit testing. */
 function draw() {
   chart.frame = 0;
   const rect = canvas.getBoundingClientRect();
@@ -963,6 +1078,11 @@ function updateHover(event, activate = false) {
   else hideTip($('map-tip'));
 }
 
+/**
+ * Change the view radius while optionally holding a canvas point in place.
+ * @param {number} factor - Multiplier of the current view radius.
+ * @param {number[]} [point] - Anchor x and y in CSS pixels relative to the canvas.
+ */
 function zoom(factor, point) {
   const oldRadius = camera.radius;
   camera.radius = Math.max(.65, Math.min(83000, camera.radius * factor));
@@ -1084,6 +1204,13 @@ const viewFilters = {
   match: 'trait-match',
 };
 
+/**
+ * Encode the current view in the versioned URL fragment.
+ *
+ * Host and planet names are used so links can survive catalog row reordering.
+ * Camera fields are yaw, pitch, radius, horizontal pan, and vertical pan.
+ * @returns {string} Absolute hosted or local file URL.
+ */
 function viewLink() {
   const params = new URLSearchParams({ v:'1', system:selected.name, map:camera.view });
   if ($('search').value) params.set('q', $('search').value);
@@ -1099,6 +1226,13 @@ function viewLink() {
   return url.href;
 }
 
+/**
+ * Validate and apply a version 1 view fragment to the current catalog.
+ *
+ * Unknown filter options and comparison entries fall back to valid defaults
+ * or are skipped. Camera values are checked before they reach the renderer.
+ * @returns {boolean} Whether the fragment used the supported view format.
+ */
 function restoreView() {
   const fragment = window.location.hash.slice(1);
   if (fragment.length > 12000) return false;

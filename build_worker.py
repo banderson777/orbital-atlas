@@ -13,6 +13,11 @@ ASSETS = {
 
 
 def main():
+    """Build the Worker entry point from the current offline chart files.
+
+    The generated module embeds the allowlisted assets with their MIME types.
+    Sites packages the module at dist/server/index.js.
+    """
     root = Path(__file__).resolve().parent
     dist = root / "dist"
     assets = {f"/{name}": (mime, (dist / name).read_bytes().decode("utf-8"))
